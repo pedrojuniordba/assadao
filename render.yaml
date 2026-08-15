@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: biazzi-emporio
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /api/orders
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TZ
+        value: America/Sao_Paulo
+      - key: DATABASE_URL
+        fromDatabase:
+          name: biazzi-db
+          property: connectionString
+      - key: WHATSAPP_PHONE
+        sync: false
+      - key: CALLMEBOT_APIKEY
+        sync: false
+      - key: ALLOWED_ORIGIN
+        value: "*"
+
+databases:
+  - name: biazzi-db
+    plan: free
+    databaseName: biazzi
+    user: biazzi
