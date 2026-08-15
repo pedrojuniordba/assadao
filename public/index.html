@@ -690,7 +690,7 @@ function renderOrders(search=''){
       </div>
     </div>`).join('');
 }
-function prodLabel(v){return{'meat':'🥩 Carne','chicken':'🍗 Frango','chicken-special':'🍗 Frango Recheado','half-chicken':'🍗 Meio Frango','ribs':'🥩 Costela','other':'Outro'}[v]||v;}
+function prodLabel(v){return{'meat':'🥩 Carne','chicken':'🍗 Frango','chickenspecial':'🍗 Frango Recheado','halfchicken':'🍗 Meio Frango','ribs':'🥩 Costela','other':'Outro'}[v]||v;}
 function payLabel(v){return{'cash':'💵 Dinheiro','card':'💳 Cartão','pix':'⚡ PIX'}[v]||v;}
 function statusLabel(v){return{'pending':'Pendente','paid':'Pago','cancelled':'Cancelado'}[v]||v;}
 
@@ -881,7 +881,7 @@ function renderStats(){
           </div>`:''}
             ${chickenHalfTotal>0?`<div style="text-align:center;">
             <div style="font-family:'Playfair Display',serif;font-size:2.2rem;color:var(--ember);">${chickenHalfTotal.toFixed(0)}<span style="font-size:1rem">un</span></div>
-            <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">🍗 Frango Recheado</div>
+            <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">🍗 Meio Frango Assado</div>
           </div>`:''}
           ${pendingInRange.length>0?`<div style="text-align:center;">
             <div style="font-family:'Playfair Display',serif;font-size:2.2rem;color:var(--ember);">${pendingInRange.length}</div>
@@ -904,7 +904,9 @@ function renderStats(){
       <div class="stat-box"><div class="num">${cancelledInRange.length}</div><div class="lbl">Cancelados</div></div>
       <div class="stat-box"><div class="num" style="font-size:1.2rem">${fmt(revenue)}</div><div class="lbl">Receita</div></div>
       <div class="stat-box"><div class="num">${meatTotal.toFixed(1)}<span style="font-size:.9rem">kg</span></div><div class="lbl">🥩 Carne</div></div>
-      <div class="stat-box"><div class="num">${chickenTotal.toFixed(0)}<span style="font-size:.9rem">un</span></div><div class="lbl">🍗 Frango</div></div>
+      <div class="stat-box"><div class="num">${chickenTotal.toFixed(0)}<span style="font-size:.9rem">un</span></div><div class="lbl">🍗 Frango Assado</div></div>
+      <div class="stat-box"><div class="num">${chickenSpecialTotal.toFixed(0)}<span style="font-size:.9rem">un</span></div><div class="lbl">🍗 Frango Assado Recheado</div></div>
+      <div class="stat-box"><div class="num">${chickenHalfTotal.toFixed(0)}<span style="font-size:.9rem">un</span></div><div class="lbl">🍗 Meio Frango Assado</div></div>
     `;
 
     // Monthly breakdown
