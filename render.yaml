@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: biazzi-emporio
+    name: assadao
     env: node
     region: oregon
     plan: free

@@ -235,9 +235,10 @@
 <!-- ── BARRA DE ESTOQUE ─────────────────────────────────────────────────── -->
 <div id="stock-bar" style="background:var(--ash);border-bottom:1px solid var(--border);padding:.55rem 2rem;display:flex;align-items:center;gap:1.2rem;flex-wrap:wrap;">
   <span style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;">📦 Estoque disponível:</span>
-  <span id="stock-meat"  class="stock-pill">🥩 Carne: —</span>
+  <span id="stock-meat"  class="stock-pill">🥩 Diversos: —</span>
   <span id="stock-ribs"  class="stock-pill">🥩 Costela: —</span>
   <span id="stock-chicken" class="stock-pill">🍗 Frango: —</span>
+  <span id="stock-chicken" class="stock-pill">🍗 Frango recheado: —</span>
   <button onclick="openStockModal()" style="margin-left:auto;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:.3rem .7rem;font-size:.75rem;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s;" onmouseover="this.style.borderColor='var(--ember)';this.style.color='var(--ember)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">⚙ Definir estoque</button>
 </div>
 
@@ -252,7 +253,7 @@
     </div>
     <div class="form-grid" style="margin-bottom:1rem;">
       <div>
-        <label>🥩 Carne (kg)</label>
+        <label>🥩 Diversos (kg)</label>
         <input type="number" id="stock-input-meat" min="0" step="0.5" placeholder="0"/>
       </div>
       <div>
@@ -262,6 +263,10 @@
     </div>
     <div style="margin-bottom:1.5rem;">
       <label>🍗 Frango Assado (unidades)</label>
+      <input type="number" id="stock-input-chicken" min="0" step="1" placeholder="0"/>
+    </div>
+       <div style="margin-bottom:1.5rem;">
+      <label>🍗 Frango Assado Recheado (unidades)</label>
       <input type="number" id="stock-input-chicken" min="0" step="1" placeholder="0"/>
     </div>
     <div class="modal-actions">
@@ -561,9 +566,11 @@ function showTab(id, btn) {
 }
 
 const PRODUCTS=[
-  {label:'🥩 Carne (kg)',val:'meat',price:89.90},
-  {label:'🍗 Frango Assado (un)',val:'chicken',price:54.90},
-  {label:'🥩 Costela (kg)',val:'ribs',price:59.90},
+  {label:'🥩 Diversos (kg)',val:'meat',price:59.90},
+  {label:'🍗 Frango Assado (un)',val:'chicken',price:60.00},
+  {label:'🍗 Frango Assado Recheado (un)',val:'chicken',price:65.00},
+  {label:'🍗 Meio Frango Assado (un)',val:'chicken',price:35.00},
+  {label:'🥩 Costela (kg)',val:'ribs',price:80.00},
   {label:'Outro',val:'other',price:0},
 ];
 function addItemRow(cid, fn){
@@ -673,7 +680,7 @@ function renderOrders(search=''){
       </div>
     </div>`).join('');
 }
-function prodLabel(v){return{'meat':'🥩 Carne','chicken':'🍗 Frango','ribs':'🥩 Costela','other':'Outro'}[v]||v;}
+function prodLabel(v){return{'meat':'🥩 Carne','chicken':'🍗 Frango','chicken':'🍗 Frango Recheado','chicken':'🍗 Meio Frango','ribs':'🥩 Costela','other':'Outro'}[v]||v;}
 function payLabel(v){return{'cash':'💵 Dinheiro','card':'💳 Cartão','pix':'⚡ PIX'}[v]||v;}
 function statusLabel(v){return{'pending':'Pendente','paid':'Pago','cancelled':'Cancelado'}[v]||v;}
 
@@ -846,11 +853,19 @@ function renderStats(){
           </div>
           ${meatTotal>0?`<div style="text-align:center;">
             <div style="font-family:'Playfair Display',serif;font-size:2.2rem;color:var(--fire);">${meatTotal.toFixed(2)}<span style="font-size:1rem">kg</span></div>
-            <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">🥩 Carne</div>
+            <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">🥩 Diversos</div>
+          </div>`:''}
+            ${meatTotal>0?`<div style="text-align:center;">
+            <div style="font-family:'Playfair Display',serif;font-size:2.2rem;color:var(--fire);">${meatTotal.toFixed(2)}<span style="font-size:1rem">kg</span></div>
+            <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">🥩 Costela</div>
           </div>`:''}
           ${chickenTotal>0?`<div style="text-align:center;">
             <div style="font-family:'Playfair Display',serif;font-size:2.2rem;color:var(--ember);">${chickenTotal.toFixed(0)}<span style="font-size:1rem">un</span></div>
             <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">🍗 Frango</div>
+          </div>`:''}
+           ${chickenTotal>0?`<div style="text-align:center;">
+            <div style="font-family:'Playfair Display',serif;font-size:2.2rem;color:var(--ember);">${chickenTotal.toFixed(0)}<span style="font-size:1rem">un</span></div>
+            <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">🍗 Frango Recheado</div>
           </div>`:''}
           ${pendingInRange.length>0?`<div style="text-align:center;">
             <div style="font-family:'Playfair Display',serif;font-size:2.2rem;color:var(--ember);">${pendingInRange.length}</div>
