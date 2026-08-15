@@ -527,8 +527,8 @@ function renderStockBar() {
   pill('stock-meat',    parseFloat(s.meat||0),    ' kg');
   pill('stock-ribs',    parseFloat(s.ribs||0),    ' kg');
   pill('stock-chicken', parseFloat(s.chicken||0), ' un');
-  pill('stock-half-chicken', parseFloat(s.chickenhalf||0), ' un');
-  pill('stock-chicken-special', parseFloat(s.chickenspecial||0), ' un');
+  pill('stock-half-chicken', parseFloat(s.half_chicken||0), ' un');
+  pill('stock-chicken-special', parseFloat(s.chicken_special||0), ' un');
 }
 
 function openStockModal() {
@@ -539,9 +539,9 @@ function openStockModal() {
   api(`/stock/${orderDate}`).then(s => {
     document.getElementById('stock-input-meat').value    = parseFloat(s.meat||0);
     document.getElementById('stock-input-ribs').value    = parseFloat(s.ribs||0);
-    document.getElementById('stock-input-half-chicken').value = parseFloat(s.chickenhalf||0);
+    document.getElementById('stock-input-half-chicken').value = parseFloat(s.half_chicken||0);
     document.getElementById('stock-input-chicken').value = parseFloat(s.chicken||0);
-    document.getElementById('stock-input-chicken-special').value = parseFloat(s.chickenspecial||0);
+    document.getElementById('stock-input-chicken-special').value = parseFloat(s.chicken_special||0);
   }).catch(()=>{});
   document.getElementById('stock-modal').classList.add('open');
 }
