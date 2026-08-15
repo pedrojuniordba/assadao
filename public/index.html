@@ -578,8 +578,8 @@ function showTab(id, btn) {
 const PRODUCTS=[
   {label:'🥩 Diversos (kg)',val:'meat',price:59.90},
   {label:'🍗 Frango Assado (un)',val:'chicken',price:60.00},
-  {label:'🍗 Frango Assado Recheado (un)',val:'chicken',price:65.00},
-  {label:'🍗 Meio Frango Assado (un)',val:'chicken',price:35.00},
+  {label:'🍗 Frango Assado Recheado (un)',val:'chicken-special',price:65.00},
+  {label:'🍗 Meio Frango Assado (un)',val:'half-chicken',price:35.00},
   {label:'🥩 Costela (kg)',val:'ribs',price:80.00},
   {label:'Outro',val:'other',price:0},
 ];
@@ -690,7 +690,7 @@ function renderOrders(search=''){
       </div>
     </div>`).join('');
 }
-function prodLabel(v){return{'meat':'🥩 Carne','chicken':'🍗 Frango','chicken':'🍗 Frango Recheado','chicken':'🍗 Meio Frango','ribs':'🥩 Costela','other':'Outro'}[v]||v;}
+function prodLabel(v){return{'meat':'🥩 Carne','chicken':'🍗 Frango','chicken-special':'🍗 Frango Recheado','half-chicken':'🍗 Meio Frango','ribs':'🥩 Costela','other':'Outro'}[v]||v;}
 function payLabel(v){return{'cash':'💵 Dinheiro','card':'💳 Cartão','pix':'⚡ PIX'}[v]||v;}
 function statusLabel(v){return{'pending':'Pendente','paid':'Pago','cancelled':'Cancelado'}[v]||v;}
 
@@ -840,6 +840,8 @@ function renderStats(){
 
   const meatTotal=allItems.filter(i=>i.type==='meat'||i.type==='ribs').reduce((s,i)=>s+parseFloat(i.qty||0),0);
   const chickenTotal=allItems.filter(i=>i.type==='chicken').reduce((s,i)=>s+parseFloat(i.qty||0),0);
+  const chickenSpecialTotal=allItems.filter(i=>i.type==='chickenspecial').reduce((s,i)=>s+parseFloat(i.qty||0),0);
+  const chickenHalfTotal=allItems.filter(i=>i.type==='halfchicken').reduce((s,i)=>s+parseFloat(i.qty||0),0);
   const maxQ=Math.max(meatTotal,chickenTotal,1);
 
   // Payment map
@@ -873,8 +875,12 @@ function renderStats(){
             <div style="font-family:'Playfair Display',serif;font-size:2.2rem;color:var(--ember);">${chickenTotal.toFixed(0)}<span style="font-size:1rem">un</span></div>
             <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">🍗 Frango</div>
           </div>`:''}
-           ${chickenTotal>0?`<div style="text-align:center;">
-            <div style="font-family:'Playfair Display',serif;font-size:2.2rem;color:var(--ember);">${chickenTotal.toFixed(0)}<span style="font-size:1rem">un</span></div>
+           ${chickenSpecialTotal>0?`<div style="text-align:center;">
+            <div style="font-family:'Playfair Display',serif;font-size:2.2rem;color:var(--ember);">${chickenSpecialTotal.toFixed(0)}<span style="font-size:1rem">un</span></div>
+            <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">🍗 Frango Recheado</div>
+          </div>`:''}
+            ${chickenHalfTotal>0?`<div style="text-align:center;">
+            <div style="font-family:'Playfair Display',serif;font-size:2.2rem;color:var(--ember);">${chickenHalfTotal.toFixed(0)}<span style="font-size:1rem">un</span></div>
             <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">🍗 Frango Recheado</div>
           </div>`:''}
           ${pendingInRange.length>0?`<div style="text-align:center;">
@@ -922,10 +928,6 @@ function renderStats(){
             <div class="month-title">${lbl.charAt(0).toUpperCase()+lbl.slice(1)}</div>
             <div class="bar-container">
               <div class="bar-label"><span>🥩 Diversos & Costela</span><span>${meat.toFixed(2)} kg</span></div>
-              <div class="bar-track"><div class="bar-fill bar-meat" style="width:${(meat/maxM*100).toFixed(1)}%">${meat>0?meat.toFixed(1):''}</div></div>
-            </div>
-              <div class="bar-container">
-              <div class="bar-label"><span>🥩 Carne & Costela</span><span>${meat.toFixed(2)} kg</span></div>
               <div class="bar-track"><div class="bar-fill bar-meat" style="width:${(meat/maxM*100).toFixed(1)}%">${meat>0?meat.toFixed(1):''}</div></div>
             </div>
             <div class="bar-container">
