@@ -4,8 +4,8 @@ Sistema web completo para gestão de reservas, estoque, pagamentos, estatística
 
 **Stack:** Node.js 20 · Express · PostgreSQL  
 **Hospedagem:** Render.com  
-**URL Admin:** https://biazzi-emporio.onrender.com  
-**URL Reservas (pública):** https://biazzi-emporio.onrender.com/reserva
+**URL Admin:** https://assadao.onrender.com  
+**URL Reservas (pública):** https://assasao.onrender.com/reserva
 
 ---
 
@@ -46,7 +46,7 @@ Sistema web completo para gestão de reservas, estoque, pagamentos, estatística
 ```bash
 cd churrascoapp
 git init && git add .
-git commit -m "Biazzi Empório da Carne v2.0"
+git commit -m "Assadão do Carioca"
 git branch -M main
 git remote add origin https://github.com/SEU_USUARIO/biazzi-emporio.git
 git push -u origin main

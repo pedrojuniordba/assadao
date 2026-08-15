@@ -1,7 +1,7 @@
 {
-  "name": "biazzi-emporio-da-carne",
+  "name": "assadao",
   "version": "1.0.0",
-  "description": "Sistema de pedidos — Biazzi Empório da Carne",
+  "description": "Sistema de pedidos — Assasão do Carioca",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
