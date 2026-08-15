@@ -549,31 +549,19 @@ function openStockModal() {
 function closeStockModal() { document.getElementById('stock-modal').classList.remove('open'); }
 
 async function saveStock() {
-    const dataVenda = document.getElementById('stock-date').value;
-  if (!dataVenda) return alert('Selecione uma data');
-
-  const novosDados = {
-    meat: parseFloat(document.getElementById('stock-input-meat').value) || 0,
-    ribs: parseFloat(document.getElementById('stock-input-ribs').value) || 0,
-    half_chicken: parseFloat(document.getElementById('stock-input-half-chicken').value) || 0,
-    chicken: parseFloat(document.getElementById('stock-input-chicken').value) || 0,
-    chicken_special: parseFloat(document.getElementById('stock-input-chicken-special').value) || 0
-  };
+  const date    = document.getElementById('stock-date').value;
+  const meat    = parseFloat(document.getElementById('stock-input-meat').value)||0;
+  const ribs    = parseFloat(document.getElementById('stock-input-ribs').value)||0;
+  const halfchicken = parseFloat(document.getElementById('stock-input-half-chicken').value)||0;
+  const chicken = parseFloat(document.getElementById('stock-input-chicken').value)||0;
+  const chickenspecial = parseFloat(document.getElementById('stock-input-chicken-special').value)||0;
+  if (!date) { toast('⚠ Selecione a data de venda.'); return; }
   try {
-    // Envia os dados para a API do seu backend
-    await api(`/stock/${dataVenda}`, 'POST', novosDados);
-    
-    // O PULO DO GATO: Atualiza a variável local imediatamente com os novos valores informados
-    currentStock = { ...novosDados };
-    
-    // Recarrega os elementos na tela
-    renderStockBar();
+    await api('/stock', 'POST', { sale_date: date, meat, ribs, halfchicken, chicken, chickenspecial });
+    toast('✅ Estoque atualizado!');
     closeStockModal();
-    alert('Estoque atualizado com sucesso!');
-  } catch(e) { 
-    console.error('Erro ao salvar estoque:', e);
-    alert('Erro ao salvar no servidor');
-  }
+    await loadStock(date);
+  } catch(e) { toast('❌ ' + e.message); }
 }
 
 // Atualiza barra de estoque quando a data do pedido muda
