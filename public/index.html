@@ -914,7 +914,7 @@ function renderStats(){
     document.getElementById('stats-monthly').innerHTML = months.length===0
       ? `<div class="empty" style="padding:1.5rem"><span>📅</span>Sem pedidos no período selecionado.</div>`
       : months.map(m=>{
-          const {meat,chicken}=monthMap[m];
+          const {meat,chicken,halfchicken,chickenspecial}=monthMap[m];
           const [y,mo]=m.split('-');
           const lbl=new Date(Number(y),Number(mo)-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
           return`<div class="month-row">
@@ -932,12 +932,12 @@ function renderStats(){
               <div class="bar-track"><div class="bar-fill bar-chicken" style="width:${(chicken/maxM*100).toFixed(1)}%">${chicken>0?chicken.toFixed(0):''}</div></div>
             </div>
              <div class="bar-container">
-              <div class="bar-label"><span>🍗 Frango Assado Recheado</span><span>${chicken.toFixed(0)} un</span></div>
-              <div class="bar-track"><div class="bar-fill bar-chicken" style="width:${(chicken/maxM*100).toFixed(1)}%">${chicken>0?chicken.toFixed(0):''}</div></div>
+              <div class="bar-label"><span>🍗 Frango Assado Recheado</span><span>${chickenspecial.toFixed(0)} un</span></div>
+              <div class="bar-track"><div class="bar-fill bar-chicken" style="width:${(chickenspecial/maxM*100).toFixed(1)}%">${chickenspecial>0?chickenspecial.toFixed(0):''}</div></div>
             </div>
              <div class="bar-container">
-              <div class="bar-label"><span>🍗 Meio Frango Assado</span><span>${chicken.toFixed(0)} un</span></div>
-              <div class="bar-track"><div class="bar-fill bar-chicken" style="width:${(chicken/maxM*100).toFixed(1)}%">${chicken>0?chicken.toFixed(0):''}</div></div>
+              <div class="bar-label"><span>🍗 Meio Frango Assado</span><span>${halfchicken.toFixed(0)} un</span></div>
+              <div class="bar-track"><div class="bar-fill bar-chicken" style="width:${(halfchicken/maxM*100).toFixed(1)}%">${halfchicken>0?halfchicken.toFixed(0):''}</div></div>
             </div>
           </div>`;
         }).join('');
