@@ -911,11 +911,23 @@ function renderStats(){
           return`<div class="month-row">
             <div class="month-title">${lbl.charAt(0).toUpperCase()+lbl.slice(1)}</div>
             <div class="bar-container">
+              <div class="bar-label"><span>🥩 Diversos & Costela</span><span>${meat.toFixed(2)} kg</span></div>
+              <div class="bar-track"><div class="bar-fill bar-meat" style="width:${(meat/maxM*100).toFixed(1)}%">${meat>0?meat.toFixed(1):''}</div></div>
+            </div>
+              <div class="bar-container">
               <div class="bar-label"><span>🥩 Carne & Costela</span><span>${meat.toFixed(2)} kg</span></div>
               <div class="bar-track"><div class="bar-fill bar-meat" style="width:${(meat/maxM*100).toFixed(1)}%">${meat>0?meat.toFixed(1):''}</div></div>
             </div>
             <div class="bar-container">
               <div class="bar-label"><span>🍗 Frango Assado</span><span>${chicken.toFixed(0)} un</span></div>
+              <div class="bar-track"><div class="bar-fill bar-chicken" style="width:${(chicken/maxM*100).toFixed(1)}%">${chicken>0?chicken.toFixed(0):''}</div></div>
+            </div>
+             <div class="bar-container">
+              <div class="bar-label"><span>🍗 Frango Assado Recheado</span><span>${chicken.toFixed(0)} un</span></div>
+              <div class="bar-track"><div class="bar-fill bar-chicken" style="width:${(chicken/maxM*100).toFixed(1)}%">${chicken>0?chicken.toFixed(0):''}</div></div>
+            </div>
+             <div class="bar-container">
+              <div class="bar-label"><span>🍗 Meio Frango Assado</span><span>${chicken.toFixed(0)} un</span></div>
               <div class="bar-track"><div class="bar-fill bar-chicken" style="width:${(chicken/maxM*100).toFixed(1)}%">${chicken>0?chicken.toFixed(0):''}</div></div>
             </div>
           </div>`;
@@ -925,7 +937,7 @@ function renderStats(){
   // Total chart (sempre visível)
   document.getElementById('stats-chart').innerHTML=`
     <div class="bar-container">
-      <div class="bar-label"><span>🥩 Carne & Costela</span><span>${meatTotal.toFixed(2)} kg</span></div>
+      <div class="bar-label"><span>🥩 Diversos & Costela</span><span>${meatTotal.toFixed(2)} kg</span></div>
       <div class="bar-track"><div class="bar-fill bar-meat" style="width:${(meatTotal/maxQ*100).toFixed(1)}%">${meatTotal.toFixed(1)}</div></div>
     </div>
     <div class="bar-container" style="margin-top:.8rem">
