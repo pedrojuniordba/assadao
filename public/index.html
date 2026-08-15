@@ -504,7 +504,8 @@ async function loadOrders(){
 async function loadHistory(){ history = await api('/history'); renderHistory(); }
 
 // ─── ESTOQUE ─────────────────────────────────────────────────────────────────
-let currentStock = { meat: 0, ribs: 0, chicken: 0 };
+//let currentStock = { meat: 0, ribs: 0, chicken: 0 };
+let currentStock = { meat: 0, ribs: 0, half_chicken: 0, chicken: 0, chicken_special: 0 };
 
 async function loadStock(date) {
   try {
@@ -526,8 +527,8 @@ function renderStockBar() {
   pill('stock-meat',    parseFloat(s.meat||0),    ' kg');
   pill('stock-ribs',    parseFloat(s.ribs||0),    ' kg');
   pill('stock-chicken', parseFloat(s.chicken||0), ' un');
-  pill('stock-half-chicken', parseFloat(s.chicken||0), ' un');
-  pill('stock-chicken-special', parseFloat(s.chicken||0), ' un');
+  pill('stock-half-chicken', parseFloat(s.chickenhalf||0), ' un');
+  pill('stock-chicken-special', parseFloat(s.chickenspecial||0), ' un');
 }
 
 function openStockModal() {
@@ -538,9 +539,9 @@ function openStockModal() {
   api(`/stock/${orderDate}`).then(s => {
     document.getElementById('stock-input-meat').value    = parseFloat(s.meat||0);
     document.getElementById('stock-input-ribs').value    = parseFloat(s.ribs||0);
-    document.getElementById('stock-input-half-chicken').value = parseFloat(s.chicken||0);
+    document.getElementById('stock-input-half-chicken').value = parseFloat(s.chickenhalf||0);
     document.getElementById('stock-input-chicken').value = parseFloat(s.chicken||0);
-    document.getElementById('stock-input-chicken-special').value = parseFloat(s.chicken||0);
+    document.getElementById('stock-input-chicken-special').value = parseFloat(s.chickenspecial||0);
   }).catch(()=>{});
   document.getElementById('stock-modal').classList.add('open');
 }
@@ -556,7 +557,7 @@ async function saveStock() {
   const chickenspecial = parseFloat(document.getElementById('stock-input-chicken-special').value)||0;
   if (!date) { toast('⚠ Selecione a data de venda.'); return; }
   try {
-    await api('/stock', 'POST', { sale_date: date, meat, ribs, chicken });
+    await api('/stock', 'POST', { sale_date: date, meat, ribs, halfchicken, chicken, chickenspecial });
     toast('✅ Estoque atualizado!');
     closeStockModal();
     await loadStock(date);
