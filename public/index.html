@@ -561,26 +561,24 @@ async function saveStock() {
   const dataVenda = document.getElementById('stock-date').value;
   if (!dataVenda) return alert('Por favor, selecione uma data de venda.');
 
-  // Captura os dados com os nomes corretos esperados pelo renderizador
+  // TESTE: Enviando apenas os 3 que já funcionavam antes no seu banco
   const novosDados = {
     meat: parseFloat(document.getElementById('stock-input-meat').value) || 0,
     ribs: parseFloat(document.getElementById('stock-input-ribs').value) || 0,
-    half_chicken: parseFloat(document.getElementById('stock-input-half-chicken').value) || 0,
-    chicken: parseFloat(document.getElementById('stock-input-chicken').value) || 0,
-    chicken_special: parseFloat(document.getElementById('stock-input-chicken-special').value) || 0
+    chicken: parseFloat(document.getElementById('stock-input-chicken').value) || 0
   };
 
   try {
-    // Faz a chamada para a sua API salvar no banco de dados do Render
     await api(`/stock/${dataVenda}`, 'POST', novosDados);
     
-    // Atualiza a memória local com as variáveis certas
-    currentStock = { ...novosDados };
+    // Atualiza o estado na memória do navegador
+    currentStock.meat = novosDados.meat;
+    currentStock.ribs = novosDados.ribs;
+    currentStock.chicken = novosDados.chicken;
     
-    // Redesenha a barra na tela imediatamente
     renderStockBar();
     closeStockModal();
-    alert('Estoque gravado e atualizado com sucesso!');
+    alert('Estoque gravado com sucesso (modo teste)!');
   } catch(e) { 
     console.error('Erro ao salvar estoque:', e);
     alert('Erro ao gravar as informações no servidor.');
