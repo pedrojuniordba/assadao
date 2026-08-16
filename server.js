@@ -142,15 +142,22 @@ app.post('/api/orders', async (req, res) => {
     const meatQty    = items.filter(i=>i.type==='meat').reduce((s,i)=>s+parseFloat(i.qty),0);
     const ribsQty    = items.filter(i=>i.type==='ribs').reduce((s,i)=>s+parseFloat(i.qty),0);
     const chickenQty = items.filter(i=>i.type==='chicken').reduce((s,i)=>s+parseFloat(i.qty),0);
+    const halfChickenQty = items.filter(i=>i.type==='half_chicken').reduce((s,i)=>s+parseFloat(i.qty),0);
+    const chickenSpecialQty = items.filter(i=>i.type==='chicken_special').reduce((s,i)=>s+parseFloat(i.qty),0);
+    
+ 
+
     if (meatQty || ribsQty || chickenQty) {
       await client.query(`
         UPDATE stock SET
           meat    = GREATEST(0, meat - $1),
           ribs    = GREATEST(0, ribs - $2),
           chicken = GREATEST(0, chicken - $3),
+          half_chicken = GREATEST(0, half_chicken - $4),
+          chicken_special = GREATEST(0, chicken_special - $5),
           updated_at = NOW()
         WHERE sale_date = $4`,
-        [meatQty, ribsQty, chickenQty, date]
+        [meatQty, ribsQty, chickenQty, halfChickenQty, chickenSpecialQty, date]
       );
     }
     await client.query('COMMIT');
@@ -209,15 +216,19 @@ app.put('/api/orders/:id', async (req, res) => {
         const meatQty    = updated.items.filter(i=>i.type==='meat').reduce((s,i)=>s+parseFloat(i.qty),0);
         const ribsQty    = updated.items.filter(i=>i.type==='ribs').reduce((s,i)=>s+parseFloat(i.qty),0);
         const chickenQty = updated.items.filter(i=>i.type==='chicken').reduce((s,i)=>s+parseFloat(i.qty),0);
+        const halfChickenQty = updated.items.filter(i=>i.type==='half_chicken').reduce((s,i)=>s+parseFloat(i.qty),0);
+        const chickenSpecialQty = updated.items.filter(i=>i.type==='chicken_special').reduce((s,i)=>s+parseFloat(i.qty),0);
         if (meatQty || ribsQty || chickenQty) {
           await client.query(`
             UPDATE stock SET
               meat    = meat + $1,
               ribs    = ribs + $2,
               chicken = chicken + $3,
+              half_chicken - half_chicken + $4,
+              chicken_special - chicken_special + $5,
               updated_at = NOW()
             WHERE sale_date = $4`,
-            [meatQty, ribsQty, chickenQty, updated.order_date]
+            [meatQty, ribsQty, chickenQty, halfChickenQty, chickenSpecialQty, updated.order_date]
           );
         }
       }
@@ -292,11 +303,13 @@ async function buildDailySummary(date) {
 
   const meatQty    = items.filter(i => i.type === 'meat' || i.type === 'ribs').reduce((s, i) => s + parseFloat(i.qty), 0);
   const chickenQty = items.find(i => i.type === 'chicken')?.qty || 0;
+  const halfChickenQty = items.find(i => i.type === 'halfchicken')?.qty || 0;
+  const chickenSpecialQty = items.find(i => i.type === 'chickenspecial')?.qty || 0;
   const fmt = n => 'R$ ' + parseFloat(n).toFixed(2).replace('.', ',');
   const dateBR = new Date(today + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
 
   return [
-    `🥩 *Biazzi Empório da Carne*`,
+    `🥩 *Assadão do Carioca*`,
     `📅 Resumo de ${dateBR}`,
     ``,
     `📦 *Pedidos*`,
@@ -307,10 +320,12 @@ async function buildDailySummary(date) {
     `🍖 *Produtos Vendidos*`,
     meatQty > 0    ? `  • 🥩 Carne & Costela: ${meatQty.toFixed(2)} kg` : null,
     chickenQty > 0 ? `  • 🍗 Frango Assado: ${parseFloat(chickenQty).toFixed(0)} unidades` : null,
+    halfChickenQty > 0 ? `  • 🍗 Meio Frango Assado: ${parseFloat(halfChickenQty).toFixed(0)} unidades` : null,
+    chickenSpecialQty > 0 ? `  • 🍗 Frango Assado Recheado: ${parseFloat(chickenSpecialQty).toFixed(0)} unidades` : null,
     ``,
     `💰 *Receita do Dia: ${fmt(revenue)}*`,
     ``,
-    `_Enviado automaticamente pelo app Biazzi_`
+    `_Enviado automaticamente pelo app Assadão do Carioca`
   ].filter(l => l !== null).join('\n');
 }
 
@@ -432,8 +447,8 @@ app.get('/api/public/available-dates', async (req, res) => {
   try {
     const today = new Date().toISOString().split('T')[0];
     const { rows } = await pool.query(`
-      SELECT sale_date, meat, ribs, chicken FROM stock
-      WHERE sale_date >= $1 AND (meat > 0 OR ribs > 0 OR chicken > 0)
+      SELECT sale_date, meat, ribs, half_chicken, chicken, chicken_special FROM stock
+      WHERE sale_date >= $1 AND (meat > 0 OR ribs > 0 OR half_chicken > 0 OR chicken > 0 OR chicken_special > 0)
       ORDER BY sale_date ASC`, [today]);
     res.json(rows.map(r => ({
       ...r,
@@ -474,7 +489,7 @@ app.post('/api/public/reserva', reservaLimiter, async (req, res) => {
     if (qty <= 0) continue;
     const avail = parseFloat(stock[item.type] || 0);
     if (avail < qty) {
-      const labels = { meat: 'Carne', ribs: 'Costela', chicken: 'Frango' };
+      const labels = { meat: 'Carne', ribs: 'Costela', chicken: 'Frango', chicken_special: 'Frango Recheado', half_chicken: 'Meio Frango' };
       return res.status(400).json({ error: `Quantidade indisponível para ${labels[item.type] || item.type}. Disponível: ${avail}` });
     }
   }
@@ -500,15 +515,20 @@ app.post('/api/public/reserva', reservaLimiter, async (req, res) => {
     const meatQty    = items.filter(i=>i.type==='meat').reduce((s,i)=>s+parseFloat(i.qty||0),0);
     const ribsQty    = items.filter(i=>i.type==='ribs').reduce((s,i)=>s+parseFloat(i.qty||0),0);
     const chickenQty = items.filter(i=>i.type==='chicken').reduce((s,i)=>s+parseFloat(i.qty||0),0);
+    const halfChickenQty = items.filter(i=>i.type==='half_chicken').reduce((s,i)=>s+parseFloat(i.qty||0),0);
+    const chickenSpecialQty = items.filter(i=>i.type==='chicken_special').reduce((s,i)=>s+parseFloat(i.qty||0),0);
+    
     if (meatQty || ribsQty || chickenQty) {
       await client.query(`
         UPDATE stock SET
           meat    = GREATEST(0, meat - $1),
           ribs    = GREATEST(0, ribs - $2),
           chicken = GREATEST(0, chicken - $3),
+          half_chicken = GREATEST(0, half_chicken - $4),
+          chicken_special = GREATEST(0, chicken_special - $5),
           updated_at = NOW()
         WHERE sale_date = $4`,
-        [meatQty, ribsQty, chickenQty, order_date]
+        [meatQty, ribsQty, chickenQty, halfChickenQty, chickenSpecialQty, order_date]
       );
     }
     await client.query('COMMIT');
@@ -523,7 +543,7 @@ app.post('/api/public/reserva', reservaLimiter, async (req, res) => {
 
     // 1. WhatsApp para o DONO (notificação de novo pedido)
     const msgDono = [
-      `🥩 *Biazzi — Nova Reserva!*`,
+      `🥩 *Assadão do Carioca — Nova Reserva!*`,
       ``,
       `👤 *${name.trim()}*`,
       `📱 ${cleanPhone}`,
@@ -638,7 +658,7 @@ app.use('/api/stock', requireAuth);
 // ─── START ────────────────────────────────────────────────────────────────────
 initDB().then(() => {
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n🥩 Biazzi Empório da Carne — App rodando na porta ${PORT}`);
+    console.log(`\n🥩 Assadão do Carioca — App rodando na porta ${PORT}`);
     if (process.env.APP_URL) console.log(`   URL: ${process.env.APP_URL}`);
   });
 }).catch(e => {
