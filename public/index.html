@@ -845,7 +845,7 @@ function renderStats(){
   const chickenTotal=allItems.filter(i=>i.type==='chicken').reduce((s,i)=>s+parseFloat(i.qty||0),0);
   const chickenSpecialTotal=allItems.filter(i=>i.type==='chickenspecial').reduce((s,i)=>s+parseFloat(i.qty||0),0);
   const chickenHalfTotal=allItems.filter(i=>i.type==='halfchicken').reduce((s,i)=>s+parseFloat(i.qty||0),0);
-  const maxQ=Math.max(meatTotal,chickenTotal,1);
+  const maxQ=Math.max(meatTotal,chickenTotal,chickenSpecialTotal,chickenHalfTotal,1);
 
   // Payment map
   const payMap={};
@@ -919,9 +919,17 @@ function renderStats(){
       if(!monthMap[month]) monthMap[month]={meat:0,chicken:0};
       if(i.type==='meat'||i.type==='ribs') monthMap[month].meat+=i.qty;
       if(i.type==='chicken') monthMap[month].chicken+=i.qty;
+      if(i.type==='half_chicken') monthMap[month].half_chicken+=i.qty;
+      if(i.type==='chicken_special') monthMap[month].chicken_special+=i.qty;
     });
     const months=Object.keys(monthMap).sort();
-    const maxM=months.length?Math.max(...months.map(m=>Math.max(monthMap[m].meat,monthMap[m].chicken)),1):1;
+    const maxM = months.length ? Math.max(...months.map(m => Math.max(
+    monthMap[m].meat || 0,
+    monthMap[m].ribs || 0,
+    monthMap[m].half_chicken || 0,
+    monthMap[m].chicken || 0,
+    monthMap[m].chicken_special || 0
+    )), 1) : 1;
 
     document.getElementById('stats-monthly').innerHTML = months.length===0
       ? `<div class="empty" style="padding:1.5rem"><span>📅</span>Sem pedidos no período selecionado.</div>`
