@@ -64,13 +64,15 @@ async function initDB() {
       resolved_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS stock (
-      id         SERIAL PRIMARY KEY,
-      sale_date  DATE    NOT NULL UNIQUE,
-      meat       NUMERIC NOT NULL DEFAULT 0,
-      ribs       NUMERIC NOT NULL DEFAULT 0,
-      chicken    NUMERIC NOT NULL DEFAULT 0,
-      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      id              SERIAL PRIMARY KEY,
+      sale_date       DATE    NOT NULL UNIQUE,
+      meat            NUMERIC NOT NULL DEFAULT 0,
+      ribs            NUMERIC NOT NULL DEFAULT 0,
+      chicken         NUMERIC NOT NULL DEFAULT 0,
+      half_chicken    NUMERIC NOT NULL DEFAULT 0,       -- ADICIONADO
+      chicken_special NUMERIC NOT NULL DEFAULT 0,       -- ADICIONADO
+      created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at      TIMESTAMP NOT NULL DEFAULT NOW()
     );
   `);
   console.log('✅ Banco de dados inicializado.');
@@ -374,31 +376,45 @@ cron.schedule('0 0 20 * * 0', async () => {
 }, { timezone: process.env.TZ || 'America/Sao_Paulo' });
 
 // ─── ROUTES: STOCK ────────────────────────────────────────────────────────────
-// GET estoque por data
+// ROTA GET: Busca o estoque da data informada
 app.get('/api/stock/:date', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM stock WHERE sale_date = $1', [req.params.date]);
-    if (!rows.length) return res.json({ sale_date: req.params.date, meat: 0, ribs: 0, chicken: 0 });
-    const r = rows[0];
-    res.json({ ...r, sale_date: r.sale_date?.toISOString().split('T')[0] });
+    if (!rows.length) {
+      // Retorna objeto zerado padrão com os 5 itens se não houver registro na data
+      return res.json({ meat: 0, ribs: 0, half_chicken: 0, chicken: 0, chicken_special: 0 });
+    }
+    res.json(rows[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST/PUT define estoque para uma data (upsert)
-app.post('/api/stock', async (req, res) => {
-  const { sale_date, meat, ribs, chicken } = req.body;
-  if (!sale_date) return res.status(400).json({ error: 'sale_date is required' });
+// ROTA POST: Cria ou atualiza o estoque de uma data específica
+app.post('/api/stock/:date', async (req, res) => {
+  const { meat, ribs, half_chicken, chicken, chicken_special } = req.body;
+  const date = req.params.date;
+
   try {
-    const { rows } = await pool.query(`
-      INSERT INTO stock (sale_date, meat, ribs, chicken)
-      VALUES ($1, $2, $3, $4)
+    const query = `
+      INSERT INTO stock (sale_date, meat, ribs, half_chicken, chicken, chicken_special, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, NOW())
       ON CONFLICT (sale_date) DO UPDATE SET
-        meat = $2, ribs = $3, chicken = $4, updated_at = NOW()
-      RETURNING *`,
-      [sale_date, parseFloat(meat)||0, parseFloat(ribs)||0, parseFloat(chicken)||0]
-    );
-    const r = rows[0];
-    res.json({ ...r, sale_date: r.sale_date?.toISOString().split('T')[0] });
+        meat = EXCLUDED.meat,
+        ribs = EXCLUDED.ribs,
+        half_chicken = EXCLUDED.half_chicken,
+        chicken = EXCLUDED.chicken,
+        chicken_special = EXCLUDED.chicken_special,
+        updated_at = NOW()
+      RETURNING *;
+    `;
+    const { rows } = await pool.query(query, [
+      date, 
+      meat || 0, 
+      ribs || 0, 
+      half_chicken || 0, 
+      chicken || 0, 
+      chicken_special || 0
+    ]);
+    res.json(rows[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
