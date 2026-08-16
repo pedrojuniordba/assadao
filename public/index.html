@@ -207,9 +207,52 @@
     .stats-grid{grid-template-columns:repeat(2,1fr);}
     .stat-box .num{font-size:1.4rem;}
   }
+
+  /* ── TOAST NOTIFICATIONS ── */
+  #toast-container{
+    position:fixed;
+    top:88px;
+    right:24px;
+    z-index:9999;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    pointer-events:none;
+  }
+  .toast{
+    min-width:300px;
+    max-width:420px;
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:14px 16px;
+    background:rgba(35,26,16,.97);
+    border:1px solid var(--border);
+    border-left:4px solid var(--green);
+    border-radius:12px;
+    color:var(--cream);
+    box-shadow:0 12px 35px rgba(0,0,0,.45);
+    backdrop-filter:blur(10px);
+    font-size:.9rem;
+    animation:toastIn .28s ease forwards;
+  }
+  .toast.error{border-left-color:var(--red);}
+  .toast-icon{font-size:1.25rem;line-height:1;}
+  .toast-content{display:flex;flex-direction:column;gap:2px;}
+  .toast-title{font-weight:700;color:var(--cream);}
+  .toast-message{font-size:.8rem;color:var(--muted);}
+  .toast.hide{animation:toastOut .25s ease forwards;}
+  @keyframes toastIn{from{opacity:0;transform:translateX(25px)}to{opacity:1;transform:translateX(0)}}
+  @keyframes toastOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(25px)}}
+  @media(max-width:640px){
+    #toast-container{top:72px;left:12px;right:12px;}
+    .toast{min-width:0;max-width:none;width:100%;}
+  }
+
 </style>
 </head>
 <body>
+<div id="toast-container" aria-live="polite" aria-atomic="true"></div>
 
 <!-- ── TELA DE LOGIN ────────────────────────────────────────────────────── -->
 <div id="login-screen">
@@ -235,7 +278,7 @@
 
 <!-- ── BARRA DE ESTOQUE ─────────────────────────────────────────────────── -->
 <div id="stock-bar" style="background:var(--ash);border-bottom:1px solid var(--border);padding:.55rem 2rem;display:flex;align-items:center;gap:1.2rem;flex-wrap:wrap;">
-  <span style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;">📦 Estoque disponível <span id="stock-current-date" style="color:var(--gold);font-weight:700;"></span>:</span>
+  <span style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;">📦 Estoque disponível:</span>
   <span id="stock-meat"  class="stock-pill">🥩 Diversos: —</span>
   <span id="stock-ribs"  class="stock-pill">🥩 Costela: —</span>
   <span id="stock-half-chicken" class="stock-pill">🍗 Meio Frango: —</span>
@@ -251,7 +294,7 @@
     <p style="color:var(--muted);font-size:.88rem;margin-bottom:1.2rem;">Informe a quantidade disponível para a data de venda selecionada. O sistema irá abater automaticamente a cada reserva registrada.</p>
     <div style="margin-bottom:1rem;">
       <label>Data de venda</label>
-      <input type="date" id="stock-date" onchange="loadStockIntoModal(this.value)"/>
+      <input type="date" id="stock-date"/>
     </div>
     <div class="form-grid" style="margin-bottom:1rem;">
       <div>
@@ -517,12 +560,6 @@ async function loadStock(date) {
 
 function renderStockBar() {
   const s = currentStock;
-  const date = document.getElementById('f-date')?.value || currentStock.sale_date || isoToday();
-  const dateEl = document.getElementById('stock-current-date');
-  if (dateEl) {
-    const [y,m,d] = date.split('-');
-    dateEl.textContent = `(${d}/${m}/${y})`;
-  }
   const pill = (id, val, unit) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -547,31 +584,40 @@ function renderStockBar() {
 }
 
 function openStockModal() {
+  // Pré-preenche com a data do pedido se estiver na aba Nova Reserva
   const orderDate = document.getElementById('f-date')?.value || isoToday();
   document.getElementById('stock-date').value = orderDate;
-  loadStockIntoModal(orderDate);
+  // Carrega estoque atual para aquela data
+  api(`/stock/${orderDate}`).then(s => {
+    document.getElementById('stock-input-meat').value    = parseFloat(s.meat||0);
+    document.getElementById('stock-input-ribs').value    = parseFloat(s.ribs||0);
+    document.getElementById('stock-input-half-chicken').value = parseFloat(s.half_chicken||0);
+    document.getElementById('stock-input-chicken').value = parseFloat(s.chicken||0);
+    document.getElementById('stock-input-chicken-special').value = parseFloat(s.chicken_special||0);
+  }).catch(()=>{});
   document.getElementById('stock-modal').classList.add('open');
-}
-
-async function loadStockIntoModal(date) {
-  if (!date) return;
-  try {
-    const s = await api(`/stock/${date}`);
-    document.getElementById('stock-input-meat').value = Number(s.meat || 0);
-    document.getElementById('stock-input-ribs').value = Number(s.ribs || 0);
-    document.getElementById('stock-input-half-chicken').value = Number(s.half_chicken || 0);
-    document.getElementById('stock-input-chicken').value = Number(s.chicken || 0);
-    document.getElementById('stock-input-chicken-special').value = Number(s.chicken_special || 0);
-  } catch (e) {
-    console.error('Erro ao carregar estoque da data:', e);
-  }
 }
 
 function closeStockModal() { document.getElementById('stock-modal').classList.remove('open'); }
 
+function showToast(message, type='success', title=null) {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+  const toast = document.createElement('div');
+  toast.className = 'toast' + (type === 'error' ? ' error' : '');
+  const icon = type === 'error' ? '⚠️' : '✓';
+  const heading = title || (type === 'error' ? 'Não foi possível salvar' : 'Tudo certo!');
+  toast.innerHTML = `<span class="toast-icon">${icon}</span><div class="toast-content"><div class="toast-title">${heading}</div><div class="toast-message">${message}</div></div>`;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add('hide');
+    setTimeout(() => toast.remove(), 250);
+  }, 3200);
+}
+
 async function saveStock() {
   const dataVenda = document.getElementById('stock-date').value;
-  if (!dataVenda) return alert('Por favor, selecione uma data de venda.');
+  if (!dataVenda) { showToast('Selecione uma data de venda para continuar.', 'error', 'Data obrigatória'); return; }
 
   const novosDados = {
     meat: parseFloat(document.getElementById('stock-input-meat').value) || 0,
@@ -588,10 +634,10 @@ async function saveStock() {
     currentStock = salvo;
     renderStockBar();
     closeStockModal();
-    alert('Estoque salvo com sucesso!');
+    showToast('O estoque foi atualizado e salvo no banco de dados.', 'success', 'Estoque salvo com sucesso');
   } catch(e) {
     console.error('Erro ao salvar estoque:', e);
-    alert('Erro ao gravar o estoque: ' + e.message);
+    showToast(e.message || 'Verifique a conexão com o servidor e tente novamente.', 'error');
   }
 }
 
