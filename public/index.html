@@ -521,14 +521,18 @@ function renderStockBar() {
     const el = document.getElementById(id);
     if (!el) return;
     
-    // CORREÇÃO 1: Força a classe 'ok' para que a borda e o texto fiquem sempre verdes
-    el.className = 'stock-pill ok';
+    // Regra Visual: Se for menor ou igual a 0, fica vermelho (empty), se não, fica verde (ok)
+    const cls = val <= 0 ? 'empty' : 'ok';
+    el.className = `stock-pill ${cls}`;
     
-    // CORREÇÃO 2: Remove a lógica do '❌ Esgotado' e exibe o número puro (ex: 0 un)
-    el.textContent = el.textContent.split(':')[0] + ': ' + val + unit;
+    // Regra de Texto: Se estiver zerado mostra Esgotado, se não, mostra o número
+    const textoValor = val <= 0 ? '❌ Esgotado' : val + unit;
+    
+    // Atualiza o texto mantendo o nome do produto intacto
+    el.textContent = el.textContent.split(':')[0] + ': ' + textoValor;
   };
   
-  // Renderiza cada um dos 5 produtos buscando a variável correta
+  // Mapeia os 5 produtos alinhando perfeitamente os nomes das variáveis
   pill('stock-meat',            parseFloat(s.meat || 0),            ' kg');
   pill('stock-ribs',            parseFloat(s.ribs || 0),            ' kg');
   pill('stock-half-chicken',     parseFloat(s.half_chicken || 0),    ' un');
@@ -554,19 +558,33 @@ function openStockModal() {
 function closeStockModal() { document.getElementById('stock-modal').classList.remove('open'); }
 
 async function saveStock() {
-  const date    = document.getElementById('stock-date').value;
-  const meat    = parseFloat(document.getElementById('stock-input-meat').value)||0;
-  const ribs    = parseFloat(document.getElementById('stock-input-ribs').value)||0;
-  const halfchicken = parseFloat(document.getElementById('stock-input-half-chicken').value)||0;
-  const chicken = parseFloat(document.getElementById('stock-input-chicken').value)||0;
-  const chickenspecial = parseFloat(document.getElementById('stock-input-chicken-special').value)||0;
-  if (!date) { toast('⚠ Selecione a data de venda.'); return; }
+  const dataVenda = document.getElementById('stock-date').value;
+  if (!dataVenda) return alert('Por favor, selecione uma data de venda.');
+
+  // Captura os dados com os nomes corretos esperados pelo renderizador
+  const novosDados = {
+    meat: parseFloat(document.getElementById('stock-input-meat').value) || 0,
+    ribs: parseFloat(document.getElementById('stock-input-ribs').value) || 0,
+    half_chicken: parseFloat(document.getElementById('stock-input-half-chicken').value) || 0,
+    chicken: parseFloat(document.getElementById('stock-input-chicken').value) || 0,
+    chicken_special: parseFloat(document.getElementById('stock-input-chicken-special').value) || 0
+  };
+
   try {
-    await api('/stock', 'POST', { sale_date: date, meat, ribs, halfchicken, chicken, chickenspecial });
-    toast('✅ Estoque atualizado!');
+    // Faz a chamada para a sua API salvar no banco de dados do Render
+    await api(`/stock/${dataVenda}`, 'POST', novosDados);
+    
+    // Atualiza a memória local com as variáveis certas
+    currentStock = { ...novosDados };
+    
+    // Redesenha a barra na tela imediatamente
+    renderStockBar();
     closeStockModal();
-    await loadStock(date);
-  } catch(e) { toast('❌ ' + e.message); }
+    alert('Estoque gravado e atualizado com sucesso!');
+  } catch(e) { 
+    console.error('Erro ao salvar estoque:', e);
+    alert('Erro ao gravar as informações no servidor.');
+  }
 }
 
 // Atualiza barra de estoque quando a data do pedido muda
