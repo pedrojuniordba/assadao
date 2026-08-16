@@ -75,14 +75,6 @@ async function initDB() {
       updated_at      TIMESTAMP NOT NULL DEFAULT NOW()
     );
   `);
-
-  // Migração segura para bancos criados em versões anteriores.
-  // CREATE TABLE IF NOT EXISTS não adiciona colunas novas em uma tabela existente.
-  await pool.query(`
-    ALTER TABLE stock ADD COLUMN IF NOT EXISTS half_chicken NUMERIC NOT NULL DEFAULT 0;
-    ALTER TABLE stock ADD COLUMN IF NOT EXISTS chicken_special NUMERIC NOT NULL DEFAULT 0;
-  `);
-
   console.log('✅ Banco de dados inicializado.');
 }
 
@@ -155,7 +147,7 @@ app.post('/api/orders', async (req, res) => {
     
  
 
-    if (meatQty || ribsQty || chickenQty || halfChickenQty || chickenSpecialQty) {
+    if (meatQty || ribsQty || chickenQty) {
       await client.query(`
         UPDATE stock SET
           meat    = GREATEST(0, meat - $1),
@@ -164,7 +156,7 @@ app.post('/api/orders', async (req, res) => {
           half_chicken = GREATEST(0, half_chicken - $4),
           chicken_special = GREATEST(0, chicken_special - $5),
           updated_at = NOW()
-        WHERE sale_date = $6`,
+        WHERE sale_date = $4`,
         [meatQty, ribsQty, chickenQty, halfChickenQty, chickenSpecialQty, date]
       );
     }
@@ -226,16 +218,16 @@ app.put('/api/orders/:id', async (req, res) => {
         const chickenQty = updated.items.filter(i=>i.type==='chicken').reduce((s,i)=>s+parseFloat(i.qty),0);
         const halfChickenQty = updated.items.filter(i=>i.type==='half_chicken').reduce((s,i)=>s+parseFloat(i.qty),0);
         const chickenSpecialQty = updated.items.filter(i=>i.type==='chicken_special').reduce((s,i)=>s+parseFloat(i.qty),0);
-        if (meatQty || ribsQty || chickenQty || halfChickenQty || chickenSpecialQty) {
+        if (meatQty || ribsQty || chickenQty) {
           await client.query(`
             UPDATE stock SET
-              meat = meat + $1,
-              ribs = ribs + $2,
+              meat    = meat + $1,
+              ribs    = ribs + $2,
               chicken = chicken + $3,
-              half_chicken = half_chicken + $4,
-              chicken_special = chicken_special + $5,
+              half_chicken - half_chicken + $4,
+              chicken_special - chicken_special + $5,
               updated_at = NOW()
-            WHERE sale_date = $6`,
+            WHERE sale_date = $4`,
             [meatQty, ribsQty, chickenQty, halfChickenQty, chickenSpecialQty, updated.order_date]
           );
         }
@@ -526,7 +518,7 @@ app.post('/api/public/reserva', reservaLimiter, async (req, res) => {
     const halfChickenQty = items.filter(i=>i.type==='half_chicken').reduce((s,i)=>s+parseFloat(i.qty||0),0);
     const chickenSpecialQty = items.filter(i=>i.type==='chicken_special').reduce((s,i)=>s+parseFloat(i.qty||0),0);
     
-    if (meatQty || ribsQty || chickenQty || halfChickenQty || chickenSpecialQty) {
+    if (meatQty || ribsQty || chickenQty) {
       await client.query(`
         UPDATE stock SET
           meat    = GREATEST(0, meat - $1),
@@ -535,7 +527,7 @@ app.post('/api/public/reserva', reservaLimiter, async (req, res) => {
           half_chicken = GREATEST(0, half_chicken - $4),
           chicken_special = GREATEST(0, chicken_special - $5),
           updated_at = NOW()
-        WHERE sale_date = $6`,
+        WHERE sale_date = $4`,
         [meatQty, ribsQty, chickenQty, halfChickenQty, chickenSpecialQty, order_date]
       );
     }

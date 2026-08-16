@@ -235,7 +235,7 @@
 
 <!-- ── BARRA DE ESTOQUE ─────────────────────────────────────────────────── -->
 <div id="stock-bar" style="background:var(--ash);border-bottom:1px solid var(--border);padding:.55rem 2rem;display:flex;align-items:center;gap:1.2rem;flex-wrap:wrap;">
-  <span style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;">📦 Estoque disponível <span id="stock-current-date" style="color:var(--gold);font-weight:700;"></span>:</span>
+  <span style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;">📦 Estoque disponível:</span>
   <span id="stock-meat"  class="stock-pill">🥩 Diversos: —</span>
   <span id="stock-ribs"  class="stock-pill">🥩 Costela: —</span>
   <span id="stock-half-chicken" class="stock-pill">🍗 Meio Frango: —</span>
@@ -251,7 +251,7 @@
     <p style="color:var(--muted);font-size:.88rem;margin-bottom:1.2rem;">Informe a quantidade disponível para a data de venda selecionada. O sistema irá abater automaticamente a cada reserva registrada.</p>
     <div style="margin-bottom:1rem;">
       <label>Data de venda</label>
-      <input type="date" id="stock-date" onchange="loadStockIntoModal(this.value)"/>
+      <input type="date" id="stock-date"/>
     </div>
     <div class="form-grid" style="margin-bottom:1rem;">
       <div>
@@ -517,12 +517,6 @@ async function loadStock(date) {
 
 function renderStockBar() {
   const s = currentStock;
-  const date = document.getElementById('f-date')?.value || currentStock.sale_date || isoToday();
-  const dateEl = document.getElementById('stock-current-date');
-  if (dateEl) {
-    const [y,m,d] = date.split('-');
-    dateEl.textContent = `(${d}/${m}/${y})`;
-  }
   const pill = (id, val, unit) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -547,24 +541,18 @@ function renderStockBar() {
 }
 
 function openStockModal() {
+  // Pré-preenche com a data do pedido se estiver na aba Nova Reserva
   const orderDate = document.getElementById('f-date')?.value || isoToday();
   document.getElementById('stock-date').value = orderDate;
-  loadStockIntoModal(orderDate);
+  // Carrega estoque atual para aquela data
+  api(`/stock/${orderDate}`).then(s => {
+    document.getElementById('stock-input-meat').value    = parseFloat(s.meat||0);
+    document.getElementById('stock-input-ribs').value    = parseFloat(s.ribs||0);
+    document.getElementById('stock-input-half-chicken').value = parseFloat(s.half_chicken||0);
+    document.getElementById('stock-input-chicken').value = parseFloat(s.chicken||0);
+    document.getElementById('stock-input-chicken-special').value = parseFloat(s.chicken_special||0);
+  }).catch(()=>{});
   document.getElementById('stock-modal').classList.add('open');
-}
-
-async function loadStockIntoModal(date) {
-  if (!date) return;
-  try {
-    const s = await api(`/stock/${date}`);
-    document.getElementById('stock-input-meat').value = Number(s.meat || 0);
-    document.getElementById('stock-input-ribs').value = Number(s.ribs || 0);
-    document.getElementById('stock-input-half-chicken').value = Number(s.half_chicken || 0);
-    document.getElementById('stock-input-chicken').value = Number(s.chicken || 0);
-    document.getElementById('stock-input-chicken-special').value = Number(s.chicken_special || 0);
-  } catch (e) {
-    console.error('Erro ao carregar estoque da data:', e);
-  }
 }
 
 function closeStockModal() { document.getElementById('stock-modal').classList.remove('open'); }
@@ -573,25 +561,27 @@ async function saveStock() {
   const dataVenda = document.getElementById('stock-date').value;
   if (!dataVenda) return alert('Por favor, selecione uma data de venda.');
 
+  // TESTE: Enviando apenas os 3 que já funcionavam antes no seu banco
   const novosDados = {
     meat: parseFloat(document.getElementById('stock-input-meat').value) || 0,
     ribs: parseFloat(document.getElementById('stock-input-ribs').value) || 0,
-    half_chicken: parseFloat(document.getElementById('stock-input-half-chicken').value) || 0,
-    chicken: parseFloat(document.getElementById('stock-input-chicken').value) || 0,
-    chicken_special: parseFloat(document.getElementById('stock-input-chicken-special').value) || 0
+    chicken: parseFloat(document.getElementById('stock-input-chicken').value) || 0
   };
 
   try {
-    const salvo = await api(`/stock/${dataVenda}`, 'POST', novosDados);
-
-    // Usa o retorno do banco como fonte da verdade
-    currentStock = salvo;
+    await api(`/stock/${dataVenda}`, 'POST', novosDados);
+    
+    // Atualiza o estado na memória do navegador
+    currentStock.meat = novosDados.meat;
+    currentStock.ribs = novosDados.ribs;
+    currentStock.chicken = novosDados.chicken;
+    
     renderStockBar();
     closeStockModal();
-    alert('Estoque salvo com sucesso!');
-  } catch(e) {
+    alert('Estoque gravado com sucesso (modo teste)!');
+  } catch(e) { 
     console.error('Erro ao salvar estoque:', e);
-    alert('Erro ao gravar o estoque: ' + e.message);
+    alert('Erro ao gravar as informações no servidor.');
   }
 }
 
