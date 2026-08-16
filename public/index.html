@@ -520,15 +520,20 @@ function renderStockBar() {
   const pill = (id, val, unit) => {
     const el = document.getElementById(id);
     if (!el) return;
-    const cls = val <= 0 ? 'empty' : val <= 2 ? 'low' : 'ok';
-    el.className = `stock-pill ${cls}`;
-    el.textContent = el.textContent.split(':')[0] + ': ' + (val <= 0 ? '❌ Esgotado' : val + unit);
+    
+    // CORREÇÃO 1: Força a classe 'ok' para que a borda e o texto fiquem sempre verdes
+    el.className = 'stock-pill ok';
+    
+    // CORREÇÃO 2: Remove a lógica do '❌ Esgotado' e exibe o número puro (ex: 0 un)
+    el.textContent = el.textContent.split(':')[0] + ': ' + val + unit;
   };
-  pill('stock-meat',    parseFloat(s.meat||0),    ' kg');
-  pill('stock-ribs',    parseFloat(s.ribs||0),    ' kg');
-  pill('stock-chicken', parseFloat(s.chicken||0), ' un');
-  pill('stock-half-chicken', parseFloat(s.half_chicken||0), ' un');
-  pill('stock-chicken-special', parseFloat(s.chicken_special||0), ' un');
+  
+  // Renderiza cada um dos 5 produtos buscando a variável correta
+  pill('stock-meat',            parseFloat(s.meat || 0),            ' kg');
+  pill('stock-ribs',            parseFloat(s.ribs || 0),            ' kg');
+  pill('stock-half-chicken',     parseFloat(s.half_chicken || 0),    ' un');
+  pill('stock-chicken',         parseFloat(s.chicken || 0),         ' un');
+  pill('stock-chicken-special', parseFloat(s.chicken_special || 0), ' un');
 }
 
 function openStockModal() {
