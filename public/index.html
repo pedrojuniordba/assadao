@@ -223,7 +223,7 @@
 <div id="login-screen">
   <div class="login-box">
     <div style="text-align:center;margin-bottom:1.5rem;">
-      <img src="/assadao-transparente.jpg" alt="Assasão do Carioca" style="height:100px;width:auto;border-radius:10px;"/>
+      <img src="/assadao.png" alt="Assasão do Carioca" style="height:100px;width:auto;border-radius:10px;"/>
     </div>
     <label for="login-password">Senha de acesso</label>
     <input type="password" id="login-password" placeholder="Digite a senha..." onkeydown="if(event.key==='Enter')doLogin()"/>
@@ -235,7 +235,7 @@
 <header>
   <div style="display:flex;align-items:center;">
     <!-- Alterado border-radius para 50% e adicionado object-fit -->
-    <img src="/assadao-transparente.jpg" alt="Assadão do Carioca" style="height:52px; width:52px; border-radius:50%; object-fit:cover; background:transparent;"/>
+    <img src="/assadao.png" alt="Assadão do Carioca" style="height:52px; width:52px; border-radius:50%; object-fit:cover; background:transparent;"/>
   </div>
   <span id="order-count-badge">carregando...</span>
   <button class="btn btn-secondary" style="font-size:.78rem;padding:.4rem .9rem;min-height:36px;" onclick="doLogout()">🔒 Sair</button>
@@ -891,7 +891,7 @@ function renderStats(){
   Object.keys(STAT_PRODUCT_META).forEach(type=>productMap[type]={qty:0,sales:0,received:0});
   allItems.forEach(i=>{if(!productMap[i.type])productMap[i.type]={qty:0,sales:0,received:0};productMap[i.type].qty+=i.qty;productMap[i.type].sales+=i.subtotal;});
 
-  const productRows=Object.keys(STAT_PRODUCT_META).map(type=>{
+  const productRows=Object.keys(STAT_PRODUCT_META).filter(type=>productMap[type]?.qty>0).map(type=>{
     const p=productMap[type],meta=STAT_PRODUCT_META[type],dec=meta.unit==='kg'?2:0;
     return `<div class="product-stat-row"><div class="product-stat-name">${meta.label}</div><div class="product-stat-value">${p.qty.toFixed(dec)} ${meta.unit}</div><div class="product-stat-sales">${fmt(p.sales)}</div></div>`;
   }).join('');
@@ -929,9 +929,9 @@ function csvEscape(value){const s=String(value??'');return '"'+s.replace(/"/g,'"
 function exportStatsCSV(){
   if(!lastStatsSnapshot)renderStats();const s=lastStatsSnapshot;if(!s)return;
   const rows=[['Data','Pedido','Cliente','Status','Pagamento','Produto','Quantidade','Unidade','Preço Unitário','Subtotal']];
-  s.inRange.forEach(o=>(o.items||[]).forEach(i=>{const type=normalizeProductType(i.type),meta=STAT_PRODUCT_META[type]||{label:type,unit:''};rows.push([getOrderDate(o),o.id,o.name||'',o.status,o.payment||'',meta.label.replace(/^\S+\s/,''),parseFloat(i.qty||0),meta.unit,parseFloat(i.price||0).toFixed(2),parseFloat(i.subtotal||0).toFixed(2)]);}));
+  s.inRange.forEach(o=>(o.items||[]).forEach(i=>{const type=normalizeProductType(i.type),meta=STAT_PRODUCT_META[type]||{label:type,unit:''};rows.push([getOrderDate(o),o.id,o.name||'',o.status,o.payment||'',meta.label.replace(/^\\S+\\s/,''),parseFloat(i.qty||0),meta.unit,parseFloat(i.price||0).toFixed(2),parseFloat(i.subtotal||0).toFixed(2)]);}));
   if(rows.length===1){toast('⚠ Não há vendas no período selecionado.');return;}
-  const csv='\uFEFF'+rows.map(r=>r.map(csvEscape).join(';')).join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`relatorio-vendas-${s.from}-${s.to}.csv`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);toast('✅ CSV exportado com sucesso.');
+  const csv='\\uFEFF'+rows.map(r=>r.map(csvEscape).join(';')).join('\\r\\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`relatorio-vendas-${s.from}-${s.to}.csv`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);toast('✅ CSV exportado com sucesso.');
 }
 function exportStatsPDF(){
   if(!lastStatsSnapshot)renderStats();const s=lastStatsSnapshot;if(!s)return;
@@ -940,7 +940,7 @@ function exportStatsPDF(){
     doc.setFontSize(18);doc.text('Relatório de Vendas',margin,y);y+=8;doc.setFontSize(10);doc.text(`Período: ${fmtDate(s.from)} a ${fmtDate(s.to)}`,margin,y);y+=8;
     doc.setFontSize(11);doc.text(`Vendas: ${s.inRange.length}`,margin,y);doc.text(`Pagas: ${s.paidInRange.length}`,70,y);doc.text(`Pendentes: ${s.pendingInRange.length}`,110,y);y+=6;doc.text(`Valor das vendas: ${fmt(s.salesValue)}`,margin,y);doc.text(`Recebido: ${fmt(s.revenue)}`,110,y);y+=10;
     doc.setFontSize(13);doc.text('Vendas por produto',margin,y);y+=7;doc.setFontSize(10);doc.text('Produto',margin,y);doc.text('Quantidade',105,y);doc.text('Vendas',150,y);y+=5;
-    Object.keys(STAT_PRODUCT_META).forEach(type=>{const p=s.productMap[type];if(!p||p.qty<=0)return;const meta=STAT_PRODUCT_META[type];doc.text(meta.label.replace(/^\S+\s/,''),margin,y);doc.text(`${p.qty.toFixed(meta.unit==='kg'?2:0)} ${meta.unit}`,105,y);doc.text(fmt(p.sales),150,y);y+=6;if(y>275){doc.addPage();y=18;}});
+    Object.keys(STAT_PRODUCT_META).forEach(type=>{const p=s.productMap[type];if(!p||p.qty<=0)return;const meta=STAT_PRODUCT_META[type];doc.text(meta.label.replace(/^\\S+\\s/,''),margin,y);doc.text(`${p.qty.toFixed(meta.unit==='kg'?2:0)} ${meta.unit}`,105,y);doc.text(fmt(p.sales),150,y);y+=6;if(y>275){doc.addPage();y=18;}});
     y+=4;doc.setFontSize(13);doc.text('Receita por pagamento',margin,y);y+=7;doc.setFontSize(10);['cash','card','pix'].forEach(p=>{const value=s.paidInRange.filter(o=>o.payment===p).reduce((sum,o)=>sum+parseFloat(o.total||0),0);doc.text(`${payLabel(p)}: ${fmt(value)}`,margin,y);y+=6;});
     doc.save(`relatorio-vendas-${s.from}-${s.to}.pdf`);toast('✅ PDF exportado com sucesso.');return;
   }
