@@ -3,7 +3,6 @@ const { Pool } = require('pg');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const cron = require('node-cron');
 const path = require('path');
 
 const app = express();
@@ -75,14 +74,6 @@ async function initDB() {
       updated_at      TIMESTAMP NOT NULL DEFAULT NOW()
     );
   `);
-
-  // Migração segura para bancos criados em versões anteriores.
-  // CREATE TABLE IF NOT EXISTS não adiciona colunas novas em uma tabela existente.
-  await pool.query(`
-    ALTER TABLE stock ADD COLUMN IF NOT EXISTS half_chicken NUMERIC NOT NULL DEFAULT 0;
-    ALTER TABLE stock ADD COLUMN IF NOT EXISTS chicken_special NUMERIC NOT NULL DEFAULT 0;
-  `);
-
   console.log('✅ Banco de dados inicializado.');
 }
 
@@ -229,8 +220,8 @@ app.put('/api/orders/:id', async (req, res) => {
         if (meatQty || ribsQty || chickenQty || halfChickenQty || chickenSpecialQty) {
           await client.query(`
             UPDATE stock SET
-              meat = meat + $1,
-              ribs = ribs + $2,
+              meat    = meat + $1,
+              ribs    = ribs + $2,
               chicken = chicken + $3,
               half_chicken = half_chicken + $4,
               chicken_special = chicken_special + $5,
@@ -281,8 +272,10 @@ app.get('/api/stats', async (req, res) => {
     const cancelled   = (await pool.query(`SELECT COUNT(*) as c FROM orders WHERE status='cancelled'`)).rows[0].c;
     const revenue     = (await pool.query(`SELECT COALESCE(SUM(total),0) as s FROM orders WHERE status='paid'`)).rows[0].s;
     const itemTotals  = (await pool.query(`
-      SELECT oi.type, SUM(oi.qty) as qty FROM order_items oi
-      JOIN orders o ON o.id = oi.order_id WHERE o.status != 'cancelled' GROUP BY oi.type
+      SELECT oi.type, SUM(oi.qty) as qty, SUM(oi.subtotal) as sales
+      FROM order_items oi
+      JOIN orders o ON o.id = oi.order_id
+      WHERE o.status != 'cancelled' GROUP BY oi.type ORDER BY oi.type
     `)).rows;
     const payTotals   = (await pool.query(`
       SELECT payment, COALESCE(SUM(total),0) as total FROM orders WHERE status='paid' GROUP BY payment
@@ -291,112 +284,7 @@ app.get('/api/stats', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ─── WHATSAPP ─────────────────────────────────────────────────────────────────
-async function buildDailySummary(date) {
-  const today = date || new Date().toISOString().split('T')[0];
-  const { rows: orders } = await pool.query(
-    `SELECT * FROM orders WHERE order_date = $1 AND status != 'cancelled'`, [today]
-  );
-  if (!orders.length) return null;
-
-  const paid    = orders.filter(o => o.status === 'paid');
-  const pending = orders.filter(o => o.status === 'pending');
-  const revenue = paid.reduce((s, o) => s + parseFloat(o.total), 0);
-
-  const { rows: items } = await pool.query(`
-    SELECT oi.type, SUM(oi.qty) as qty FROM order_items oi
-    JOIN orders o ON o.id = oi.order_id
-    WHERE o.order_date = $1 AND o.status != 'cancelled' GROUP BY oi.type`, [today]
-  );
-
-  const meatQty    = items.filter(i => i.type === 'meat' || i.type === 'ribs').reduce((s, i) => s + parseFloat(i.qty), 0);
-  const chickenQty = items.find(i => i.type === 'chicken')?.qty || 0;
-  const halfChickenQty = items.find(i => i.type === 'halfchicken')?.qty || 0;
-  const chickenSpecialQty = items.find(i => i.type === 'chickenspecial')?.qty || 0;
-  const fmt = n => 'R$ ' + parseFloat(n).toFixed(2).replace('.', ',');
-  const dateBR = new Date(today + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
-
-  return [
-    `🥩 *Assadão do Carioca*`,
-    `📅 Resumo de ${dateBR}`,
-    ``,
-    `📦 *Pedidos*`,
-    `  • Total: ${orders.length}`,
-    `  • Pagos: ${paid.length}`,
-    pending.length > 0 ? `  • Pendentes: ${pending.length}` : null,
-    ``,
-    `🍖 *Produtos Vendidos*`,
-    meatQty > 0    ? `  • 🥩 Carne & Costela: ${meatQty.toFixed(2)} kg` : null,
-    chickenQty > 0 ? `  • 🍗 Frango Assado: ${parseFloat(chickenQty).toFixed(0)} unidades` : null,
-    halfChickenQty > 0 ? `  • 🍗 Meio Frango Assado: ${parseFloat(halfChickenQty).toFixed(0)} unidades` : null,
-    chickenSpecialQty > 0 ? `  • 🍗 Frango Assado Recheado: ${parseFloat(chickenSpecialQty).toFixed(0)} unidades` : null,
-    ``,
-    `💰 *Receita do Dia: ${fmt(revenue)}*`,
-    ``,
-    `_Enviado automaticamente pelo app Assadão do Carioca`
-  ].filter(l => l !== null).join('\n');
-}
-
-async function sendWhatsApp(message) {
-  const phone  = process.env.WHATSAPP_PHONE;
-  const apiKey = process.env.CALLMEBOT_APIKEY;
-  if (!phone || !apiKey) {
-    console.log('[WhatsApp] Variáveis não configuradas — resumo não enviado.');
-    return false;
-  }
-  const url = `https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${encodeURIComponent(message)}&apikey=${apiKey}`;
-  try {
-    const { default: fetch } = await import('node-fetch');
-    const res = await fetch(url);
-    console.log(`[WhatsApp] Status: ${res.status}`);
-    return res.ok;
-  } catch (e) {
-    console.error('[WhatsApp] Erro:', e.message);
-    return false;
-  }
-}
-
-// Envia WhatsApp para qualquer número (confirmação ao cliente)
-async function sendWhatsAppToNumber(phone, message) {
-  const apiKey = process.env.CALLMEBOT_APIKEY;
-  if (!apiKey) return false;
-  // CallMeBot exige que o destinatário tenha ativado o serviço
-  // Formato: DDI + DDD + número (ex: 5541999998888)
-  const cleanPhone = phone.replace(/\D/g, '');
-  const fullPhone  = cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone;
-  const url = `https://api.callmebot.com/whatsapp.php?phone=${fullPhone}&text=${encodeURIComponent(message)}&apikey=${apiKey}`;
-  try {
-    const { default: fetch } = await import('node-fetch');
-    const res = await fetch(url);
-    console.log(`[WhatsApp Cliente] ${fullPhone} — Status: ${res.status}`);
-    return res.ok;
-  } catch (e) {
-    console.error('[WhatsApp Cliente] Erro:', e.message);
-    return false;
-  }
-}
-
-app.post('/api/whatsapp/send-summary', async (req, res) => {
-  const date = req.body?.date || new Date().toISOString().split('T')[0];
-  const msg  = await buildDailySummary(date);
-  if (!msg) return res.json({ success: false, message: 'Nenhum pedido encontrado para essa data.' });
-  const ok = await sendWhatsApp(msg);
-  res.json({ success: ok, preview: msg });
-});
-
-app.get('/api/whatsapp/preview', async (req, res) => {
-  const date = req.query.date || new Date().toISOString().split('T')[0];
-  const msg  = await buildDailySummary(date);
-  res.json({ date, preview: msg || 'Nenhum pedido para essa data.' });
-});
-
-cron.schedule('0 0 20 * * 0', async () => {
-  console.log('[Cron] Resumo dominical às 20h...');
-  const today = new Date().toISOString().split('T')[0];
-  const msg   = await buildDailySummary(today);
-  if (msg) await sendWhatsApp(msg);
-  else console.log('[Cron] Sem pedidos hoje.');
-}, { timezone: process.env.TZ || 'America/Sao_Paulo' });
+// ─── NOTIFICAÇÃO AO CLIENTE ───────────────────────────────────────────────────
 
 // ─── ROUTES: STOCK ────────────────────────────────────────────────────────────
 // ROTA GET: Busca o estoque da data informada
@@ -540,31 +428,7 @@ app.post('/api/public/reserva', reservaLimiter, async (req, res) => {
       );
     }
     await client.query('COMMIT');
-
-    // Notificações WhatsApp
-    const dateBR = new Date(order_date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' });
-    const itemLines = items.filter(i=>parseFloat(i.qty)>0).map(i => {
-      const labels = { meat:'🥩 Carne', ribs:'🥩 Costela', chicken:'🍗 Frango' };
-      const unit   = i.type==='chicken' ? ' un' : ' kg';
-      return `  • ${labels[i.type]||i.type}: ${parseFloat(i.qty)}${unit}`;
-    }).join('\n');
-
-    // 1. WhatsApp para o DONO (notificação de novo pedido)
-    const msgDono = [
-      `🥩 *Assadão do Carioca — Nova Reserva!*`,
-      ``,
-      `👤 *${name.trim()}*`,
-      `📱 ${cleanPhone}`,
-      `📅 ${dateBR}`,
-      ``,
-      `📦 *Itens:*`,
-      itemLines,
-      ``,
-      `_Pedido recebido via link de reserva_`
-    ].join('\n');
-    sendWhatsApp(msgDono).catch(() => {});
-
-    // 2. WhatsApp para o CLIENTE (confirmação)
+    // Confirmação opcional via WhatsApp para o cliente
     const msgCliente = [
       `✅ *Reserva confirmada!*`,
       ``,
@@ -660,7 +524,6 @@ function requireAuth(req, res, next) {
 app.use('/api/orders', requireAuth);
 app.use('/api/history', requireAuth);
 app.use('/api/stats', requireAuth);
-app.use('/api/whatsapp', requireAuth);
 app.use('/api/stock', requireAuth);
 
 // ─── START ────────────────────────────────────────────────────────────────────
