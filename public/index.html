@@ -76,6 +76,14 @@
   .bar-meat{background:linear-gradient(90deg,var(--fire),#c94010);}
   .bar-chicken{background:linear-gradient(90deg,var(--ember),#d48a1a);}
   /* HISTORY */
+  .product-stat-row{display:grid;grid-template-columns:1.6fr .8fr 1fr;gap:.8rem;align-items:center;padding:.75rem 0;border-bottom:1px solid var(--border);}
+  .product-stat-row:last-child{border-bottom:none;}
+  .product-stat-name{color:var(--cream);font-weight:600;}
+  .product-stat-value{color:var(--muted);text-align:center;}
+  .product-stat-sales{color:var(--ember);font-weight:700;text-align:right;}
+  @media(max-width:640px){.product-stat-row{grid-template-columns:1fr auto;gap:.4rem}.product-stat-value{grid-column:2;grid-row:1;text-align:right}.product-stat-sales{grid-column:1/-1;text-align:left;font-size:.9rem}}
+  @media print{body{background:#fff;color:#111}header,nav,#stock-bar,#login-screen,.period-shortcuts,.btn,.toast{display:none!important}main{max-width:none;padding:0}.card,.stat-box{background:#fff;color:#111;border:1px solid #ddd;break-inside:avoid}.stat-box .num,.product-stat-sales,.card h2{color:#111!important}.period-bar{display:none}}
+
   .history-row{background:var(--ash);border-left:3px solid var(--border);padding:.8rem 1rem;margin-bottom:.6rem;border-radius:0 8px 8px 0;font-size:.88rem;}
   .history-row.paid{border-left-color:var(--green);}
   .history-row.cancelled{border-left-color:var(--red);}
@@ -356,20 +364,22 @@
       </div>
     </div>
     <div class="stats-grid" id="stats-boxes"></div>
-    <div class="card"><h2>🍖 Carne vs Frango — por mês</h2><div id="stats-monthly"></div></div>
-    <div class="card"><h2>Total no Período</h2><div id="stats-chart"></div></div>
-    <div class="card"><h2>Receita por Pagamento</h2><div id="stats-payment"></div></div>
 
-    <!-- WHATSAPP -->
     <div class="card">
-      <h2>📲 Resumo por WhatsApp</h2>
-      <p style="color:var(--muted);font-size:.88rem;margin-bottom:1rem;">Envio automático todo domingo às 20h. Você também pode enviar manualmente ou visualizar o resumo do dia.</p>
-      <div style="display:flex;gap:.8rem;flex-wrap:wrap;align-items:center;">
-        <button class="btn btn-green" onclick="sendWhatsAppNow()">📤 Enviar agora</button>
-        <button class="btn btn-secondary" onclick="previewWhatsApp()">👁 Ver prévia</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:.8rem;flex-wrap:wrap;">
+        <h2 style="margin-bottom:0;">📦 Vendas por Produto</h2>
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+          <button class="btn btn-secondary btn-sm" onclick="exportStatsCSV()">⬇ CSV</button>
+          <button class="btn btn-primary btn-sm" onclick="exportStatsPDF()">⬇ PDF</button>
+          <button class="btn btn-secondary btn-sm" onclick="shareStats()">↗ Compartilhar</button>
+        </div>
       </div>
-      <div id="whatsapp-preview" style="display:none;margin-top:1rem;background:var(--ash);border:1px solid var(--border);border-radius:8px;padding:1rem;font-size:.85rem;white-space:pre-line;line-height:1.6;color:var(--cream);"></div>
+      <div id="stats-products" style="margin-top:1rem;"></div>
     </div>
+
+    <div class="card"><h2>🍖 Produtos vendidos — por mês</h2><div id="stats-monthly"></div></div>
+    <div class="card"><h2>💰 Valores de venda no período</h2><div id="stats-chart"></div></div>
+    <div class="card"><h2>💳 Receita por Pagamento</h2><div id="stats-payment"></div></div>
   </div>
 </main>
 
@@ -403,6 +413,7 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 const API = '/api';
 const TOKEN_KEY = 'biazzi_auth_token';
@@ -559,13 +570,8 @@ function closeStockModal() { document.getElementById('stock-modal').classList.re
 
 async function saveStock() {
   const dataVenda = document.getElementById('stock-date').value;
-  if (!dataVenda) {
-    toast('⚠ Selecione uma data de venda.');
-    return;
-  }
+  if (!dataVenda) return alert('Por favor, selecione uma data de venda.');
 
-  // Envia TODOS os campos de estoque suportados pelo backend.
-  // Isso evita que meio frango e frango recheado sejam gravados como zero.
   const novosDados = {
     meat: parseFloat(document.getElementById('stock-input-meat').value) || 0,
     ribs: parseFloat(document.getElementById('stock-input-ribs').value) || 0,
@@ -575,23 +581,16 @@ async function saveStock() {
   };
 
   try {
-    const saved = await api(`/stock/${dataVenda}`, 'POST', novosDados);
+    const salvo = await api(`/stock/${dataVenda}`, 'POST', novosDados);
 
-    // Usa o retorno do servidor como fonte de verdade.
-    currentStock = {
-      meat: parseFloat(saved.meat) || 0,
-      ribs: parseFloat(saved.ribs) || 0,
-      half_chicken: parseFloat(saved.half_chicken) || 0,
-      chicken: parseFloat(saved.chicken) || 0,
-      chicken_special: parseFloat(saved.chicken_special) || 0
-    };
-
+    // Usa o retorno do banco como fonte da verdade
+    currentStock = salvo;
     renderStockBar();
     closeStockModal();
-    toast('✓ Estoque salvo com sucesso!');
+    alert('Estoque salvo com sucesso!');
   } catch(e) {
     console.error('Erro ao salvar estoque:', e);
-    toast('❌ Erro ao gravar o estoque: ' + (e.message || 'verifique o servidor.'));
+    alert('Erro ao gravar o estoque: ' + e.message);
   }
 }
 
@@ -724,8 +723,8 @@ function renderOrders(search=''){
       </div>
     </div>`).join('');
 }
-function prodLabel(v){return{'meat':'🥩 Carne','chicken':'🍗 Frango','chickenspecial':'🍗 Frango Recheado','halfchicken':'🍗 Meio Frango','ribs':'🥩 Costela','other':'Outro'}[v]||v;}
-function payLabel(v){return{'cash':'💵 Dinheiro','card':'💳 Cartão','pix':'⚡ PIX'}[v]||v;}
+function prodLabel(v){const n=normalizeProductType(v);return (STAT_PRODUCT_META[n]?.label||({'meat':'🥩 Carne','chicken':'🍗 Frango','chicken_special':'🍗 Frango Recheado','half_chicken':'🍗 Meio Frango','ribs':'🥩 Costela','other':'Outro'}[n]||v));}
+function payLabel(v){return{'cash':'💵 Dinheiro','card':'💳 Cartão','pix':'⚡ PIX','a_combinar':'💰 A combinar'}[v]||v;}
 function statusLabel(v){return{'pending':'Pendente','paid':'Pago','cancelled':'Cancelado'}[v]||v;}
 
 async function markPaid(id){
@@ -854,158 +853,278 @@ function applyFilter(){
 }
 
 // ─── STATS ───────────────────────────────────────────────────────────────────
+function normalizeProductType(type){
+  const map={
+    'meat':'meat','ribs':'ribs','chicken':'chicken',
+    'chicken-special':'chicken_special','chickenspecial':'chicken_special','chicken_special':'chicken_special',
+    'half-chicken':'half_chicken','halfchicken':'half_chicken','half_chicken':'half_chicken',
+    'other':'other'
+  };
+  return map[type]||type;
+}
+
+const STAT_PRODUCT_META={
+  meat:{label:'🥩 Diversos',unit:'kg'},
+  ribs:{label:'🥩 Costela Bovina',unit:'kg'},
+  chicken:{label:'🍗 Frango Assado',unit:'un'},
+  chicken_special:{label:'🍗 Frango Assado Recheado',unit:'un'},
+  half_chicken:{label:'🍗 Meio Frango Assado',unit:'un'},
+  other:{label:'Outro',unit:'un'}
+};
+let lastStatsSnapshot=null;
+
 function renderStats(){
   const from=document.getElementById('s-from')?.value||'2000-01-01';
   const to=document.getElementById('s-to')?.value||'2099-12-31';
-  const isSingleDay = from===to && from!=='2000-01-01';
-
-  // Use full orders cache (includes paid/cancelled)
   const allData=[...allOrdersCache];
-
-  const inRange=allData.filter(o=>{ const d=getOrderDate(o); return d>=from&&d<=to&&o.status!=='cancelled'; });
-  const cancelledInRange=allData.filter(o=>{ const d=getOrderDate(o); return d>=from&&d<=to&&o.status==='cancelled'; });
+  const inRange=allData.filter(o=>{const d=getOrderDate(o);return d>=from&&d<=to&&o.status!=='cancelled';});
+  const cancelledInRange=allData.filter(o=>{const d=getOrderDate(o);return d>=from&&d<=to&&o.status==='cancelled';});
   const paidInRange=inRange.filter(o=>o.status==='paid');
   const pendingInRange=inRange.filter(o=>o.status==='pending');
+  const salesValue=inRange.reduce((s,o)=>s+parseFloat(o.total||0),0);
   const revenue=paidInRange.reduce((s,o)=>s+parseFloat(o.total||0),0);
+  const pendingValue=pendingInRange.reduce((s,o)=>s+parseFloat(o.total||0),0);
 
-  // All items from non-cancelled orders in range
   const allItems=[];
-  inRange.forEach(o=>(o.items||[]).forEach(i=>allItems.push({...i,qty:parseFloat(i.qty||0),subtotal:parseFloat(i.subtotal||0),orderDate:getOrderDate(o)})));
+  inRange.forEach(o=>(o.items||[]).forEach(i=>allItems.push({...i,type:normalizeProductType(i.type),qty:parseFloat(i.qty||0),price:parseFloat(i.price||0),subtotal:parseFloat(i.subtotal||0),orderDate:getOrderDate(o),orderId:o.id,customer:o.name||'',payment:o.payment||'',status:o.status})));
 
-  const meatTotal=allItems.filter(i=>i.type==='meat'||i.type==='ribs').reduce((s,i)=>s+parseFloat(i.qty||0),0);
-  const chickenTotal=allItems.filter(i=>i.type==='chicken').reduce((s,i)=>s+parseFloat(i.qty||0),0);
-  const chickenSpecialTotal=allItems.filter(i=>i.type==='chickenspecial').reduce((s,i)=>s+parseFloat(i.qty||0),0);
-  const chickenHalfTotal=allItems.filter(i=>i.type==='halfchicken').reduce((s,i)=>s+parseFloat(i.qty||0),0);
-  const maxQ=Math.max(meatTotal,chickenTotal,chickenSpecialTotal,chickenHalfTotal,1);
+  const productMap={};
+  Object.keys(STAT_PRODUCT_META).forEach(type=>productMap[type]={qty:0,sales:0,received:0});
+  allItems.forEach(i=>{if(!productMap[i.type])productMap[i.type]={qty:0,sales:0,received:0};productMap[i.type].qty+=i.qty;productMap[i.type].sales+=i.subtotal;});
 
-  // Payment map
-  const payMap={};
-  paidInRange.forEach(o=>{ payMap[o.payment]=(payMap[o.payment]||0)+parseFloat(o.total||0); });
+  const productRows=Object.keys(STAT_PRODUCT_META).filter(type=>productMap[type]?.qty>0).map(type=>{
+    const p=productMap[type],meta=STAT_PRODUCT_META[type],dec=meta.unit==='kg'?2:0;
+    return `<div class="product-stat-row"><div class="product-stat-name">${meta.label}</div><div class="product-stat-value">${p.qty.toFixed(dec)} ${meta.unit}</div><div class="product-stat-sales">${fmt(p.sales)}</div></div>`;
+  }).join('');
+  document.getElementById('stats-products').innerHTML=productRows||`<div class="empty" style="padding:1.5rem"><span>📦</span>Sem vendas no período selecionado.</div>`;
 
-  // ── MODO DIA ÚNICO ───────────────────────────────────────────────────────
-  if(isSingleDay){
-    const dayLabel=fmtDate(from);
-    document.getElementById('stats-boxes').innerHTML=`
-      <div class="stat-box" style="grid-column:1/-1;background:linear-gradient(135deg,var(--card-bg),var(--ash));border-color:var(--gold);">
-        <div style="font-size:.8rem;color:var(--gold);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.5rem;">📅 ${dayLabel}</div>
-        <div style="display:flex;justify-content:center;gap:2rem;flex-wrap:wrap;">
-          <div style="text-align:center;">
-            <div style="font-family:'Playfair Display',serif;font-size:2.2rem;color:var(--ember);">${paidInRange.length}</div>
-            <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">Vendas</div>
-          </div>
-          <div style="text-align:center;">
-            <div style="font-family:'Playfair Display',serif;font-size:2.2rem;color:#6fcf7a;">${fmt(revenue)}</div>
-            <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">Receita</div>
-          </div>
-          ${meatTotal>0?`<div style="text-align:center;">
-            <div style="font-family:'Playfair Display',serif;font-size:2.2rem;color:var(--fire);">${meatTotal.toFixed(2)}<span style="font-size:1rem">kg</span></div>
-            <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">🥩 Diversos</div>
-          </div>`:''}
-            ${meatTotal>0?`<div style="text-align:center;">
-            <div style="font-family:'Playfair Display',serif;font-size:2.2rem;color:var(--fire);">${meatTotal.toFixed(2)}<span style="font-size:1rem">kg</span></div>
-            <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">🥩 Costela</div>
-          </div>`:''}
-          ${chickenTotal>0?`<div style="text-align:center;">
-            <div style="font-family:'Playfair Display',serif;font-size:2.2rem;color:var(--ember);">${chickenTotal.toFixed(0)}<span style="font-size:1rem">un</span></div>
-            <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">🍗 Frango</div>
-          </div>`:''}
-           ${chickenSpecialTotal>0?`<div style="text-align:center;">
-            <div style="font-family:'Playfair Display',serif;font-size:2.2rem;color:var(--ember);">${chickenSpecialTotal.toFixed(0)}<span style="font-size:1rem">un</span></div>
-            <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">🍗 Frango Recheado</div>
-          </div>`:''}
-            ${chickenHalfTotal>0?`<div style="text-align:center;">
-            <div style="font-family:'Playfair Display',serif;font-size:2.2rem;color:var(--ember);">${chickenHalfTotal.toFixed(0)}<span style="font-size:1rem">un</span></div>
-            <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">🍗 Meio Frango Assado</div>
-          </div>`:''}
-          ${pendingInRange.length>0?`<div style="text-align:center;">
-            <div style="font-family:'Playfair Display',serif;font-size:2.2rem;color:var(--ember);">${pendingInRange.length}</div>
-            <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">Pendentes</div>
-          </div>`:''}
-        </div>
-      </div>
-    `;
-    // Esconde gráfico mensal no modo dia único, mostra só totais e pagamento
-    document.getElementById('stats-monthly').innerHTML=
-      inRange.length===0
-        ? `<div class="empty" style="padding:1.5rem"><span>📅</span>Sem pedidos neste dia.</div>`
-        : `<p style="color:var(--muted);font-size:.85rem;padding:.5rem 0;">Resumo completo do dia — selecione um período maior para ver o gráfico mensal.</p>`;
-  } else {
-    // ── MODO PERÍODO ──────────────────────────────────────────────────────
-    document.getElementById('stats-boxes').innerHTML=`
-      <div class="stat-box"><div class="num">${inRange.length}</div><div class="lbl">Pedidos</div></div>
-      <div class="stat-box"><div class="num">${paidInRange.length}</div><div class="lbl">Pagos</div></div>
-      <div class="stat-box"><div class="num">${pendingInRange.length}</div><div class="lbl">Pendentes</div></div>
-      <div class="stat-box"><div class="num">${cancelledInRange.length}</div><div class="lbl">Cancelados</div></div>
-      <div class="stat-box"><div class="num" style="font-size:1.2rem">${fmt(revenue)}</div><div class="lbl">Receita</div></div>
-      <div class="stat-box"><div class="num">${meatTotal.toFixed(1)}<span style="font-size:.9rem">kg</span></div><div class="lbl">🥩 Carne</div></div>
-      <div class="stat-box"><div class="num">${chickenTotal.toFixed(0)}<span style="font-size:.9rem">un</span></div><div class="lbl">🍗 Frango Assado</div></div>
-      <div class="stat-box"><div class="num">${chickenSpecialTotal.toFixed(0)}<span style="font-size:.9rem">un</span></div><div class="lbl">🍗 Frango Assado Recheado</div></div>
-      <div class="stat-box"><div class="num">${chickenHalfTotal.toFixed(0)}<span style="font-size:.9rem">un</span></div><div class="lbl">🍗 Meio Frango Assado</div></div>
-    `;
+  document.getElementById('stats-boxes').innerHTML=`
+    <div class="stat-box"><div class="num">${inRange.length}</div><div class="lbl">Vendas</div></div>
+    <div class="stat-box"><div class="num">${paidInRange.length}</div><div class="lbl">Pagas</div></div>
+    <div class="stat-box"><div class="num">${pendingInRange.length}</div><div class="lbl">Pendentes</div></div>
+    <div class="stat-box"><div class="num">${cancelledInRange.length}</div><div class="lbl">Canceladas</div></div>
+    <div class="stat-box"><div class="num" style="font-size:1.15rem">${fmt(salesValue)}</div><div class="lbl">Valor das Vendas</div></div>
+    <div class="stat-box"><div class="num" style="font-size:1.15rem;color:#6fcf7a">${fmt(revenue)}</div><div class="lbl">Recebido</div></div>
+    <div class="stat-box"><div class="num" style="font-size:1.15rem;color:var(--ember)">${fmt(pendingValue)}</div><div class="lbl">A Receber</div></div>`;
 
-    // Monthly breakdown
-    const monthMap={};
-    allItems.forEach(i=>{
-      const month=i.orderDate?.slice(0,7); if(!month) return;
-      if(!monthMap[month]) monthMap[month]={meat:0,chicken:0};
-      if(i.type==='meat'||i.type==='ribs') monthMap[month].meat+=i.qty;
-      if(i.type==='chicken') monthMap[month].chicken+=i.qty;
-      if(i.type==='half_chicken') monthMap[month].half_chicken+=i.qty;
-      if(i.type==='chicken_special') monthMap[month].chicken_special+=i.qty;
+  const monthMap={};
+  allItems.forEach(i=>{const month=i.orderDate?.slice(0,7);if(!month)return;if(!monthMap[month])monthMap[month]={};if(!monthMap[month][i.type])monthMap[month][i.type]={qty:0,sales:0};monthMap[month][i.type].qty+=i.qty;monthMap[month][i.type].sales+=i.subtotal;});
+  const months=Object.keys(monthMap).sort();
+  const monthMax=months.length?Math.max(...months.flatMap(m=>Object.values(monthMap[m]).map(x=>x.sales||0)),1):1;
+  document.getElementById('stats-monthly').innerHTML=months.length===0?`<div class="empty" style="padding:1.5rem"><span>📅</span>Sem vendas no período selecionado.</div>`:months.map(m=>{
+    const [y,mo]=m.split('-');const lbl=new Date(Number(y),Number(mo)-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+    return `<div class="month-row"><div class="month-title">${lbl.charAt(0).toUpperCase()+lbl.slice(1)}</div>${['meat','ribs','chicken','chicken_special','half_chicken'].filter(t=>monthMap[m][t]).map(type=>{const p=monthMap[m][type],meta=STAT_PRODUCT_META[type];return `<div class="bar-container"><div class="bar-label"><span>${meta.label}</span><span>${fmt(p.sales)} · ${p.qty.toFixed(meta.unit==='kg'?2:0)} ${meta.unit}</span></div><div class="bar-track"><div class="bar-fill ${type==='meat'||type==='ribs'?'bar-meat':'bar-chicken'}" style="width:${(p.sales/monthMax*100).toFixed(1)}%">${fmt(p.sales)}</div></div></div>`;}).join('')}</div>`;
+  }).join('');
+
+  const chartTypes=['meat','ribs','chicken','chicken_special','half_chicken','other']
+    .filter(type=>type!=='other' || productMap[type].sales>0);
+  const chartMax=Math.max(...chartTypes.map(t=>productMap[t].sales),1);
+  document.getElementById('stats-chart').innerHTML=chartTypes.map(type=>{
+    const p=productMap[type],meta=STAT_PRODUCT_META[type];
+    return `<div class="bar-container" style="margin-bottom:.9rem">
+      <div class="bar-label"><span>${meta.label}</span><span>${fmt(p.sales)} · ${p.qty.toFixed(meta.unit==='kg'?2:0)} ${meta.unit}</span></div>
+      <div class="bar-track"><div class="bar-fill ${type==='meat'||type==='ribs'?'bar-meat':'bar-chicken'}" style="width:${(p.sales/chartMax*100).toFixed(1)}%">${p.sales>0?fmt(p.sales):''}</div></div>
+    </div>`;
+  }).join('');
+
+  const payMap={};paidInRange.forEach(o=>{payMap[o.payment]=(payMap[o.payment]||0)+parseFloat(o.total||0);});
+  document.getElementById('stats-payment').innerHTML=['cash','card','pix','a_combinar'].map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:.65rem 0;border-bottom:1px solid var(--border);"><span>${p==='a_combinar'?'💰 A combinar':payLabel(p)}</span><strong style="color:var(--ember)">${fmt(payMap[p]||0)}</strong></div>`).join('');
+
+  lastStatsSnapshot={from,to,inRange,cancelledInRange,paidInRange,pendingInRange,salesValue,revenue,pendingValue,productMap,allItems};
+}
+
+function csvEscape(value){
+  const s=String(value??'');
+  return '"'+s.replace(/"/g,'""')+'"';
+}
+
+function getStatsSnapshot(){
+  if(!lastStatsSnapshot) renderStats();
+  return lastStatsSnapshot;
+}
+
+function exportStatsCSV(){
+  const s=getStatsSnapshot();
+  if(!s) return;
+
+  const rows=[[
+    'Data','Pedido','Cliente','Status','Pagamento',
+    'Produto','Quantidade','Unidade','Preço Unitário','Subtotal'
+  ]];
+
+  s.inRange.forEach(o=>{
+    (o.items||[]).forEach(i=>{
+      const type=normalizeProductType(i.type);
+      const meta=STAT_PRODUCT_META[type]||{label:type,unit:''};
+      rows.push([
+        getOrderDate(o),
+        o.id,
+        o.name||'',
+        o.status||'',
+        payLabel(o.payment||''),
+        meta.label.replace(/^[^\s]+\s/,''),
+        parseFloat(i.qty||0),
+        meta.unit,
+        parseFloat(i.price||0).toFixed(2),
+        parseFloat(i.subtotal||0).toFixed(2)
+      ]);
     });
-    const months=Object.keys(monthMap).sort();
-    const maxM = months.length ? Math.max(...months.map(m => Math.max(
-    monthMap[m].meat || 0,
-    monthMap[m].ribs || 0,
-    monthMap[m].half_chicken || 0,
-    monthMap[m].chicken || 0,
-    monthMap[m].chicken_special || 0
-    )), 1) : 1;
+  });
 
-    document.getElementById('stats-monthly').innerHTML = months.length===0
-      ? `<div class="empty" style="padding:1.5rem"><span>📅</span>Sem pedidos no período selecionado.</div>`
-      : months.map(m=>{
-          const {meat,chicken,halfchicken,chickenspecial}=monthMap[m];
-          const [y,mo]=m.split('-');
-          const lbl=new Date(Number(y),Number(mo)-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
-          return`<div class="month-row">
-            <div class="month-title">${lbl.charAt(0).toUpperCase()+lbl.slice(1)}</div>
-            <div class="bar-container">
-              <div class="bar-label"><span>🥩 Diversos & Costela</span><span>${meat.toFixed(2)} kg</span></div>
-              <div class="bar-track"><div class="bar-fill bar-meat" style="width:${(meat/maxM*100).toFixed(1)}%">${meat>0?meat.toFixed(1):''}</div></div>
-            </div>
-            <div class="bar-container">
-              <div class="bar-label"><span>🍗 Frango Assado</span><span>${chicken.toFixed(0)} un</span></div>
-              <div class="bar-track"><div class="bar-fill bar-chicken" style="width:${(chicken/maxM*100).toFixed(1)}%">${chicken>0?chicken.toFixed(0):''}</div></div>
-            </div>
-             <div class="bar-container">
-              <div class="bar-label"><span>🍗 Frango Assado Recheado</span><span>${chickenspecial.toFixed(0)} un</span></div>
-              <div class="bar-track"><div class="bar-fill bar-chicken" style="width:${(chickenspecial/maxM*100).toFixed(1)}%">${chickenspecial>0?chickenspecial.toFixed(0):''}</div></div>
-            </div>
-             <div class="bar-container">
-              <div class="bar-label"><span>🍗 Meio Frango Assado</span><span>${halfchicken.toFixed(0)} un</span></div>
-              <div class="bar-track"><div class="bar-fill bar-chicken" style="width:${(halfchicken/maxM*100).toFixed(1)}%">${halfchicken>0?halfchicken.toFixed(0):''}</div></div>
-            </div>
-          </div>`;
-        }).join('');
+  if(rows.length===1){
+    toast('⚠ Não há vendas no período selecionado.');
+    return;
   }
 
-  // Total chart (sempre visível)
-  document.getElementById('stats-chart').innerHTML=`
-    <div class="bar-container">
-      <div class="bar-label"><span>🥩 Diversos & Costela</span><span>${meatTotal.toFixed(2)} kg</span></div>
-      <div class="bar-track"><div class="bar-fill bar-meat" style="width:${(meatTotal/maxQ*100).toFixed(1)}%">${meatTotal.toFixed(1)}</div></div>
-    </div>
-    <div class="bar-container" style="margin-top:.8rem">
-      <div class="bar-label"><span>🍗 Frango Assado</span><span>${chickenTotal.toFixed(0)} un</span></div>
-      <div class="bar-track"><div class="bar-fill bar-chicken" style="width:${(chickenTotal/maxQ*100).toFixed(1)}%">${chickenTotal.toFixed(0)}</div></div>
-    </div>`;
+  const csv='\uFEFF'+rows.map(r=>r.map(csvEscape).join(';')).join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`relatorio-vendas-${s.from}-${s.to}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  toast('✅ CSV exportado com sucesso.');
+}
 
-  // Payment
-  document.getElementById('stats-payment').innerHTML=['cash','card','pix'].map(p=>`
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:.6rem 0;border-bottom:1px solid var(--border);">
-      <span>${payLabel(p)}</span><strong style="color:var(--ember)">${fmt(payMap[p]||0)}</strong>
-    </div>`).join('');
+function buildStatsPDF(){
+  const s=getStatsSnapshot();
+  if(!s || !window.jspdf?.jsPDF) return null;
+
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'mm',format:'a4'});
+  const margin=15;
+  let y=18;
+
+  doc.setFontSize(18);
+  doc.text('Relatório de Vendas',margin,y);
+  y+=7;
+
+  doc.setFontSize(10);
+  doc.text(`Período: ${fmtDate(s.from)} a ${fmtDate(s.to)}`,margin,y);
+  y+=8;
+
+  doc.setFontSize(11);
+  doc.text(`Vendas: ${s.inRange.length}`,margin,y);
+  doc.text(`Pagas: ${s.paidInRange.length}`,70,y);
+  doc.text(`Pendentes: ${s.pendingInRange.length}`,110,y);
+  y+=6;
+
+  doc.text(`Valor das vendas: ${fmt(s.salesValue)}`,margin,y);
+  doc.text(`Recebido: ${fmt(s.revenue)}`,110,y);
+  y+=10;
+
+  doc.setFontSize(13);
+  doc.text('Vendas por produto',margin,y);
+  y+=7;
+
+  doc.setFontSize(10);
+  doc.text('Produto',margin,y);
+  doc.text('Quantidade',105,y);
+  doc.text('Vendas',150,y);
+  y+=5;
+
+  Object.keys(STAT_PRODUCT_META).forEach(type=>{
+    const p=s.productMap[type];
+    if(!p || p.qty<=0) return;
+
+    const meta=STAT_PRODUCT_META[type];
+    doc.text(meta.label.replace(/^[^\s]+\s/,''),margin,y);
+    doc.text(`${p.qty.toFixed(meta.unit==='kg'?2:0)} ${meta.unit}`,105,y);
+    doc.text(fmt(p.sales),150,y);
+    y+=6;
+
+    if(y>275){
+      doc.addPage();
+      y=18;
+    }
+  });
+
+  y+=4;
+  doc.setFontSize(13);
+  doc.text('Receita por pagamento',margin,y);
+  y+=7;
+
+  doc.setFontSize(10);
+  ['cash','card','pix','a_combinar'].forEach(p=>{
+    const value=s.paidInRange
+      .filter(o=>o.payment===p)
+      .reduce((sum,o)=>sum+parseFloat(o.total||0),0);
+
+    doc.text(`${payLabel(p)}: ${fmt(value)}`,margin,y);
+    y+=6;
+  });
+
+  return doc;
+}
+
+function exportStatsPDF(){
+  const s=getStatsSnapshot();
+  if(!s) return;
+
+  const doc=buildStatsPDF();
+
+  if(doc){
+    doc.save(`relatorio-vendas-${s.from}-${s.to}.pdf`);
+    toast('✅ PDF exportado com sucesso.');
+    return;
+  }
+
+  window.print();
+  toast('ℹ️ Selecione "Salvar como PDF" na janela de impressão.');
+}
+
+async function shareStats(){
+  const s=getStatsSnapshot();
+  if(!s) return;
+
+  const productLines=Object.keys(STAT_PRODUCT_META)
+    .filter(type=>s.productMap[type]?.qty>0)
+    .map(type=>{
+      const p=s.productMap[type];
+      const meta=STAT_PRODUCT_META[type];
+      const qty=p.qty.toFixed(meta.unit==='kg'?2:0);
+      return `${meta.label.replace(/^[^\s]+\s/,'')}: ${qty} ${meta.unit} — ${fmt(p.sales)}`;
+    });
+
+  const text=[
+    '📊 Relatório de Vendas — Assadão do Carioca',
+    `Período: ${fmtDate(s.from)} a ${fmtDate(s.to)}`,
+    '',
+    `Vendas: ${s.inRange.length}`,
+    `Pagas: ${s.paidInRange.length}`,
+    `Pendentes: ${s.pendingInRange.length}`,
+    `Valor das vendas: ${fmt(s.salesValue)}`,
+    `Recebido: ${fmt(s.revenue)}`,
+    `A receber: ${fmt(s.pendingValue)}`,
+    '',
+    'Vendas por produto:',
+    ...productLines
+  ].join('\n');
+
+  try{
+    if(navigator.share){
+      await navigator.share({
+        title:'Relatório de Vendas — Assadão do Carioca',
+        text
+      });
+      return;
+    }
+
+    await navigator.clipboard.writeText(text);
+    toast('✅ Resumo copiado. Agora você pode compartilhar onde quiser.');
+  }catch(e){
+    if(e?.name!=='AbortError'){
+      try{
+        await navigator.clipboard.writeText(text);
+        toast('✅ Resumo copiado para a área de transferência.');
+      }catch{
+        toast('⚠ Não foi possível abrir o compartilhamento neste dispositivo.');
+      }
+    }
+  }
 }
 
 function updateBadge(){
@@ -1019,30 +1138,6 @@ function toast(msg){
   document.body.appendChild(el);clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.remove(),3500);
 }
 
-// ─── WHATSAPP ─────────────────────────────────────────────────────────────────
-async function sendWhatsAppNow(){
-  const date = document.getElementById('s-from')?.value || isoToday();
-  if(!confirm(`Enviar resumo do dia ${fmtDate(date)} via WhatsApp agora?`)) return;
-  try {
-    const r = await api('/whatsapp/send-summary','POST',{date});
-    if(r.success){ toast('✅ Resumo enviado no WhatsApp!'); }
-    else { toast('⚠ ' + (r.message||'Não foi possível enviar. Verifique as configurações.')); }
-    if(r.preview){ showWhatsAppPreview(r.preview); }
-  } catch(e){ toast('❌ Erro: '+e.message); }
-}
-async function previewWhatsApp(){
-  const date = document.getElementById('s-from')?.value || isoToday();
-  try {
-    const r = await api(`/whatsapp/preview?date=${date}`);
-    showWhatsAppPreview(r.preview);
-  } catch(e){ toast('❌ Erro: '+e.message); }
-}
-function showWhatsAppPreview(text){
-  const el = document.getElementById('whatsapp-preview');
-  // Convert *bold* markdown to styled spans for preview
-  el.innerHTML = text.replace(/\*(.*?)\*/g,'<strong style="color:var(--ember)">$1</strong>').replace(/_(.*?)_/g,'<em style="color:var(--muted)">$1</em>');
-  el.style.display = 'block';
-}
 
 init();
 </script>
