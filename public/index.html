@@ -518,6 +518,14 @@ async function init() {
   setShortcut('month', document.querySelector('.shortcut.active'));
   addItemRow('items-list','calcTotal');
   await Promise.all([loadOrders(), loadHistory(), loadStock(isoToday())]);
+
+  // Atualiza a aba Reservas automaticamente para refletir pedidos feitos pelo link público.
+  setInterval(async () => {
+    try {
+      await loadOrders();
+      if (document.getElementById('stats')?.classList.contains('active')) renderStats();
+    } catch(e) { console.error('Atualização automática das reservas:', e); }
+  }, 10000);
 }
 
 function isoToday(){ return new Date().toISOString().split('T')[0]; }
@@ -735,6 +743,7 @@ function renderOrders(search=''){
         </div>
         <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
           <span class="badge badge-pending">Aguardando retirada</span>
+          <span class="badge" style="background:${o.source==='link'?'rgba(58,125,68,.18)':'rgba(201,148,74,.14)'};color:${o.source==='link'?'#75c47e':'var(--gold)'};border:1px solid ${o.source==='link'?'rgba(58,125,68,.35)':'rgba(201,148,74,.25)'}">${o.source==='link'?'🔗 Link de Reserva':'📞 Admin / Telefone'}</span>
           <strong style="color:var(--ember)">${fmt(o.total)}</strong>
         </div>
       </div>
@@ -931,6 +940,8 @@ function renderStats(){
     <div class="stat-box"><div class="num">${paidInRange.length}</div><div class="lbl">Pagas</div></div>
     <div class="stat-box"><div class="num">${pendingInRange.length}</div><div class="lbl">Pendentes</div></div>
     <div class="stat-box"><div class="num">${cancelledInRange.length}</div><div class="lbl">Canceladas</div></div>
+    <div class="stat-box"><div class="num">${inRange.filter(o=>o.source==='link').length}</div><div class="lbl">🔗 Via Link</div></div>
+    <div class="stat-box"><div class="num">${inRange.filter(o=>o.source!=='link').length}</div><div class="lbl">📞 Admin / Telefone</div></div>
     <div class="stat-box"><div class="num" style="font-size:1.15rem">${fmt(salesValue)}</div><div class="lbl">Valor das Vendas</div></div>
     <div class="stat-box"><div class="num" style="font-size:1.15rem;color:#6fcf7a">${fmt(revenue)}</div><div class="lbl">Recebido</div></div>
     <div class="stat-box"><div class="num" style="font-size:1.15rem;color:var(--ember)">${fmt(pendingValue)}</div><div class="lbl">A Receber</div></div>`;

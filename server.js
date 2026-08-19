@@ -74,8 +74,19 @@ async function initDB() {
       updated_at      TIMESTAMP NOT NULL DEFAULT NOW()
     );
   `);
+  // Compatibilidade com bancos existentes: adiciona a origem sem perder dados.
+  await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'admin'`);
+  await pool.query(`ALTER TABLE history ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'admin'`);
   console.log('✅ Banco de dados inicializado.');
 }
+
+const PUBLIC_PRODUCTS = [
+  { type: 'meat', label: '🥩 Diversos', unit: 'kg', price: 59.90, step: 0.5, stockField: 'meat' },
+  { type: 'chicken', label: '🍗 Frango Assado', unit: 'un', price: 60.00, step: 1, stockField: 'chicken' },
+  { type: 'chicken_special', label: '🍗 Frango Assado Recheado', unit: 'un', price: 65.00, step: 1, stockField: 'chicken_special' },
+  { type: 'half_chicken', label: '🍗 Meio Frango Assado', unit: 'un', price: 35.00, step: 1, stockField: 'half_chicken' },
+  { type: 'ribs', label: '🥩 Costela', unit: 'kg', price: 80.00, step: 0.5, stockField: 'ribs' }
+];
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 async function getOrderWithItems(id) {
@@ -127,7 +138,7 @@ app.post('/api/orders', async (req, res) => {
   try {
     await client.query('BEGIN');
     const { rows } = await client.query(
-      `INSERT INTO orders (name, phone, total, payment, order_date) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+      `INSERT INTO orders (name, phone, total, payment, order_date, source) VALUES ($1,$2,$3,$4,$5,'admin') RETURNING id`,
       [name, phone || '', total, payment, date]
     );
     const orderId = rows[0].id;
@@ -204,11 +215,11 @@ app.put('/api/orders/:id', async (req, res) => {
 
     if ((newStatus === 'paid' || newStatus === 'cancelled') && existingStatus === 'pending') {
       await client.query(`
-        INSERT INTO history (order_id, name, phone, total, payment, status, items_json, created_at, order_date)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        INSERT INTO history (order_id, name, phone, total, payment, status, items_json, created_at, order_date, source)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
         [updated.id, updated.name, updated.phone, updated.total,
          updated.payment, newStatus, JSON.stringify(updated.items),
-         existing.created_at, updated.order_date]
+         existing.created_at, updated.order_date, existing.source || 'admin']
       );
       // Cancelamento: devolve ao estoque
       if (newStatus === 'cancelled') {
@@ -280,7 +291,13 @@ app.get('/api/stats', async (req, res) => {
     const payTotals   = (await pool.query(`
       SELECT payment, COALESCE(SUM(total),0) as total FROM orders WHERE status='paid' GROUP BY payment
     `)).rows;
-    res.json({ totalOrders, paid, pending, cancelled, revenue, itemTotals, payTotals });
+    const sourceTotals = (await pool.query(`
+      SELECT COALESCE(source,'admin') AS source, COUNT(*)::int AS orders, COALESCE(SUM(total),0) AS total
+      FROM orders
+      WHERE status != 'cancelled'
+      GROUP BY COALESCE(source,'admin')
+    `)).rows;
+    res.json({ totalOrders, paid, pending, cancelled, revenue, itemTotals, payTotals, sourceTotals });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -336,6 +353,11 @@ const reservaLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hora
   max: 20,
   message: { error: 'Muitas tentativas. Tente novamente em 1 hora.' }
+});
+
+// Catálogo público: mesmos produtos comercializados no Admin.
+app.get('/api/public/products', (req, res) => {
+  res.json(PUBLIC_PRODUCTS.map(({ stockField, ...product }) => product));
 });
 
 // Datas disponíveis para reserva (estoque > 0 a partir de hoje)
@@ -395,8 +417,8 @@ app.post('/api/public/reserva', reservaLimiter, async (req, res) => {
   try {
     await client.query('BEGIN');
     const { rows } = await client.query(
-      `INSERT INTO orders (name, phone, total, payment, order_date, status)
-       VALUES ($1,$2,$3,'a_combinar',$4,'pending') RETURNING id`,
+      `INSERT INTO orders (name, phone, total, payment, order_date, status, source)
+       VALUES ($1,$2,$3,'a_combinar',$4,'pending','link') RETURNING id`,
       [name.trim(), cleanPhone, total, order_date]
     );
     const orderId = rows[0].id;
@@ -428,52 +450,7 @@ app.post('/api/public/reserva', reservaLimiter, async (req, res) => {
       );
     }
     await client.query('COMMIT');
-    // Confirmação opcional via WhatsApp para o cliente
-    // Formata a data e os itens no servidor para evitar referências
-    // a variáveis inexistentes no contexto da rota.
-    const dateBR = new Date(`${order_date}T12:00:00`).toLocaleDateString('pt-BR', {
-      weekday: 'long',
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric'
-    });
-    const labels = {
-      meat: '🥩 Carne',
-      ribs: '🥩 Costela',
-      chicken: '🍗 Frango',
-      chicken_special: '🍗 Frango Recheado',
-      half_chicken: '🍗 Meio Frango'
-    };
-    const units = {
-      meat: 'kg',
-      ribs: 'kg',
-      chicken: 'un',
-      chicken_special: 'un',
-      half_chicken: 'un'
-    };
-    const itemLines = items
-      .filter(i => parseFloat(i.qty) > 0)
-      .map(i => `${labels[i.type] || i.type} × ${i.qty} ${units[i.type] || 'un'} — R$ ${(parseFloat(i.subtotal) || 0).toFixed(2).replace('.', ',')}`)
-      .join('\n');
-
-    const msgCliente = [
-      `✅ *Reserva confirmada!*`,
-      ``,
-      `Olá, *${name.trim()}*! Sua reserva no`,
-      `🥩 *Assadão do Carioca* foi registrada.`,
-      ``,
-      `📅 *Data:* ${dateBR}`,
-      `📦 *Itens reservados:*`,
-      itemLines,
-      ``,
-      `⚠️ O pagamento é feito na retirada.`,
-      `Em caso de dúvidas, entre em contato conosco.`,
-      ``,
-      `_Até domingo! 🙌_`
-    ].join('\n');
-    sendWhatsAppToNumber(cleanPhone, msgCliente).catch(() => {});
-
-    res.status(201).json({ success: true, orderId, message: 'Reserva confirmada! Você receberá uma confirmação pelo WhatsApp.' });
+    res.status(201).json({ success: true, orderId, message: 'Reserva registrada com sucesso!' });
   } catch (e) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: e.message });

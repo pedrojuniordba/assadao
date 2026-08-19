@@ -257,36 +257,41 @@ function selectDate(date, el) {
 
 function goToStep1() { showStep('step-date', 1); }
 
-async function goToStep2() {
-  if (!selectedDate) return;
-  // Carrega estoque da data selecionada
-  selectedStock = await fetch(`${API}/stock/${selectedDate}`).then(r=>r.json());
-  buildProductsForm();
-  showStep('step-products', 2);
+let productCatalog = [];
+
+async function loadProductCatalog() {
+  if (productCatalog.length) return productCatalog;
+  const response = await fetch(`${API}/products`);
+  if (!response.ok) throw new Error('Não foi possível carregar os produtos.');
+  productCatalog = await response.json();
+  return productCatalog;
 }
 
-// ── STEP 2: PRODUTOS ───────────────────────────────────────────────────────
-const PRICES = { meat: 89.90, ribs: 59.90, chicken: 54.90 }; // preços por unidade
+async function goToStep2() {
+  if (!selectedDate) return;
+  try {
+    await loadProductCatalog();
+    selectedStock = await fetch(`${API}/stock/${selectedDate}`).then(r=>r.json());
+    buildProductsForm();
+    showStep('step-products', 2);
+  } catch (e) {
+    document.getElementById('form-error').textContent = e.message;
+    document.getElementById('form-error').classList.add('visible');
+  }
+}
 
 function buildProductsForm() {
   const s = selectedStock;
   const pills = document.getElementById('stock-pills');
   const form  = document.getElementById('products-form');
 
-  const meatAvail    = parseFloat(s.meat    || 0);
-  const ribsAvail    = parseFloat(s.ribs    || 0);
-  const chickenAvail = parseFloat(s.chicken || 0);
+  const rows = productCatalog
+    .map(p => ({ ...p, avail: parseFloat(s[p.type] ?? s[p.stockField] ?? 0) }))
+    .filter(p => p.avail > 0);
 
-  pills.innerHTML = [
-    meatAvail    > 0 ? `<span class="stock-tag ${meatAvail<=2?'low':'ok'}">🥩 Carne: ${meatAvail} kg disp.</span>` : '',
-    ribsAvail    > 0 ? `<span class="stock-tag ${ribsAvail<=2?'low':'ok'}">🥩 Costela: ${ribsAvail} kg disp.</span>` : '',
-    chickenAvail > 0 ? `<span class="stock-tag ${chickenAvail<=5?'low':'ok'}">🍗 Frango: ${chickenAvail} un disp.</span>` : '',
-  ].join('');
-
-  const rows = [];
-  if (meatAvail > 0) rows.push({ type:'meat',    label:'🥩 Carne', unit:'kg',  avail:meatAvail,    step:0.5, price:PRICES.meat });
-  if (ribsAvail > 0) rows.push({ type:'ribs',     label:'🥩 Costela', unit:'kg', avail:ribsAvail,  step:0.5, price:PRICES.ribs });
-  if (chickenAvail > 0) rows.push({ type:'chicken', label:'🍗 Frango Assado', unit:'un', avail:chickenAvail, step:1, price:PRICES.chicken });
+  pills.innerHTML = rows.map(r =>
+    `<span class="stock-tag ${r.avail <= (r.unit === 'kg' ? 2 : 5) ? 'low' : 'ok'}">${r.label}: ${r.avail} ${r.unit} disp.</span>`
+  ).join('');
 
   if (!rows.length) {
     form.innerHTML = `<div class="empty-state"><div class="icon">😔</div><p>Estoque esgotado para esta data.</p></div>`;
@@ -305,14 +310,17 @@ function buildProductsForm() {
     <div class="avail-hint">Disponível: ${r.avail} ${r.unit}</div>
   `).join('');
 
-  // Inicializa qtys
   window._qtys = {};
   window._priceMap = {};
   window._stepMap = {};
+  window._labelMap = {};
+  window._unitMap = {};
   rows.forEach(r => {
-    window._qtys[r.type]     = 0;
+    window._qtys[r.type] = 0;
     window._priceMap[r.type] = r.price;
-    window._stepMap[r.type]  = r.step;
+    window._stepMap[r.type] = r.step;
+    window._labelMap[r.type] = r.label;
+    window._unitMap[r.type] = r.unit;
   });
   calcPubTotal();
 }
@@ -354,15 +362,13 @@ function goToStep3() {
 
 // ── STEP 3: DADOS PESSOAIS ─────────────────────────────────────────────────
 function buildPreview() {
-  const dt     = new Date(selectedDate + 'T12:00:00');
+  const dt = new Date(selectedDate + 'T12:00:00');
   const dateBR = dt.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' });
-  const labels = { meat:'🥩 Carne', ribs:'🥩 Costela', chicken:'🍗 Frango' };
-  const units  = { meat:'kg', ribs:'kg', chicken:'un' };
-  const total  = selectedItems.reduce((s,i) => s + i.subtotal, 0);
+  const total = selectedItems.reduce((s,i) => s + i.subtotal, 0);
 
   document.getElementById('preview-content').innerHTML = `
     <div>📅 <strong>${dateBR}</strong></div>
-    ${selectedItems.map(i=>`<div>${labels[i.type]} × ${i.qty} ${units[i.type]} = <strong style="color:var(--ember)">R$ ${i.subtotal.toFixed(2).replace('.',',')}</strong></div>`).join('')}
+    ${selectedItems.map(i=>`<div>${window._labelMap[i.type] || i.type} × ${i.qty} ${window._unitMap[i.type] || 'un'} = <strong style="color:var(--ember)">R$ ${i.subtotal.toFixed(2).replace('.',',')}</strong></div>`).join('')}
     <div style="margin-top:.5rem;padding-top:.5rem;">💰 Estimativa: <strong style="color:var(--ember)">R$ ${total.toFixed(2).replace('.',',')}</strong></div>
   `;
 }
@@ -411,14 +417,12 @@ async function submitReserva() {
 }
 
 function buildSuccessScreen(name, phone) {
-  const dt     = new Date(selectedDate + 'T12:00:00');
+  const dt = new Date(selectedDate + 'T12:00:00');
   const dateBR = dt.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
-  const labels = { meat:'🥩 Carne', ribs:'🥩 Costela', chicken:'🍗 Frango' };
-  const units  = { meat:'kg', ribs:'kg', chicken:'un' };
   document.getElementById('success-summary').innerHTML = `
     <div>👤 <strong>${name}</strong></div>
     <div>📅 ${dateBR}</div>
-    ${selectedItems.map(i=>`<div>${labels[i.type]} × ${i.qty} ${units[i.type]}</div>`).join('')}
+    ${selectedItems.map(i=>`<div>${window._labelMap[i.type] || i.type} × ${i.qty} ${window._unitMap[i.type] || 'un'}</div>`).join('')}
     <div>📱 ${phone}</div>
   `;
 }
