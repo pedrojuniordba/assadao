@@ -106,7 +106,9 @@
   .success-box .order-summary{background:var(--ash);border:1px solid var(--border);border-radius:10px;padding:1.2rem;margin:1.2rem 0;text-align:left;}
   .success-box .order-summary div{font-size:.9rem;color:var(--cream);padding:.3rem 0;border-bottom:1px solid var(--border);}
   .success-box .order-summary div:last-child{border-bottom:none;}
-/* EMPTY / ERROR */
+  .whatsapp-note{background:rgba(58,125,68,.15);border:1px solid #3a7d44;border-radius:8px;padding:.8rem 1rem;color:#6fcf7a;font-size:.85rem;margin-top:1rem;}
+
+  /* EMPTY / ERROR */
   .empty-state{text-align:center;padding:2.5rem 1rem;color:var(--muted);}
   .empty-state .icon{font-size:2.5rem;margin-bottom:.75rem;}
   .error-msg{color:#e57373;font-size:.85rem;margin-top:.5rem;display:none;}
@@ -184,7 +186,7 @@
       <h3>👤 Seus dados</h3>
       <label for="pub-name">Nome completo</label>
       <input type="text" id="pub-name" placeholder="Seu nome" oninput="validateStep3()"/>
-      <label for="pub-phone">Telefone (com DDD)</label>
+      <label for="pub-phone">WhatsApp (com DDD)</label>
       <input type="tel" id="pub-phone" placeholder="41 9 9999-9999" oninput="validateStep3()" onblur="formatPhone(this)"/>
       <div class="error-msg" id="form-error"></div>
     </div>
@@ -205,9 +207,10 @@
       <div class="success-box">
         <div class="icon">✅</div>
         <h2>Reserva confirmada!</h2>
-        <p>Sua reserva foi registrada com sucesso e já está disponível para a equipe.</p>
+        <p>Sua reserva foi registrada com sucesso.</p>
         <div class="order-summary" id="success-summary"></div>
-                <p style="margin-top:1.2rem;font-size:.85rem;">Até domingo! Traga sua sacola 🙌</p>
+        <div class="whatsapp-note" style="display:none;"></div>
+        <p style="margin-top:1.2rem;font-size:.85rem;">Até domingo! Traga sua sacola 🙌</p>
       </div>
     </div>
     <button class="btn btn-secondary" onclick="resetForm()" style="margin-top:0;">Fazer outra reserva</button>
@@ -389,7 +392,7 @@ async function submitReserva() {
   errEl.classList.remove('visible');
 
   const btn = document.getElementById('btn-confirm');
-  btn.disabled = true; btn.textContent = '⏳ Registrando reserva...';
+  btn.disabled = true; btn.textContent = '⏳ Enviando...';
 
   try {
     const res = await fetch('/api/public/reserva', {
