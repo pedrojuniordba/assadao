@@ -429,11 +429,38 @@ app.post('/api/public/reserva', reservaLimiter, async (req, res) => {
     }
     await client.query('COMMIT');
     // Confirmação opcional via WhatsApp para o cliente
+    // Formata a data e os itens no servidor para evitar referências
+    // a variáveis inexistentes no contexto da rota.
+    const dateBR = new Date(`${order_date}T12:00:00`).toLocaleDateString('pt-BR', {
+      weekday: 'long',
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric'
+    });
+    const labels = {
+      meat: '🥩 Carne',
+      ribs: '🥩 Costela',
+      chicken: '🍗 Frango',
+      chicken_special: '🍗 Frango Recheado',
+      half_chicken: '🍗 Meio Frango'
+    };
+    const units = {
+      meat: 'kg',
+      ribs: 'kg',
+      chicken: 'un',
+      chicken_special: 'un',
+      half_chicken: 'un'
+    };
+    const itemLines = items
+      .filter(i => parseFloat(i.qty) > 0)
+      .map(i => `${labels[i.type] || i.type} × ${i.qty} ${units[i.type] || 'un'} — R$ ${(parseFloat(i.subtotal) || 0).toFixed(2).replace('.', ',')}`)
+      .join('\n');
+
     const msgCliente = [
       `✅ *Reserva confirmada!*`,
       ``,
       `Olá, *${name.trim()}*! Sua reserva no`,
-      `🥩 *Biazzi Empório da Carne* foi registrada.`,
+      `🥩 *Assadão do Carioca* foi registrada.`,
       ``,
       `📅 *Data:* ${dateBR}`,
       `📦 *Itens reservados:*`,
