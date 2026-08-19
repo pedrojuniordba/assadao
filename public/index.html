@@ -101,6 +101,31 @@
   .empty span{display:block;font-size:2.5rem;margin-bottom:.5rem;}
   .toast{position:fixed;bottom:2rem;right:2rem;background:var(--ash);border:1px solid var(--gold);color:var(--cream);padding:.9rem 1.4rem;border-radius:10px;font-size:.9rem;z-index:999;animation:fadeIn .3s ease;box-shadow:0 4px 20px rgba(0,0,0,.4);}
 
+
+  /* ── CONFIRM MODAL ── */
+  .confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.68);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);display:none;align-items:center;justify-content:center;padding:1.25rem;z-index:2000;}
+  .confirm-overlay.open{display:flex;animation:confirmFade .18s ease-out;}
+  .confirm-box{width:min(100%,420px);background:var(--card-bg);border:1px solid var(--border);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.55);padding:1.5rem;transform:translateY(6px) scale(.98);animation:confirmIn .2s ease-out forwards;}
+  .confirm-icon{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:rgba(192,57,43,.13);border:1px solid rgba(192,57,43,.35);font-size:1.35rem;margin-bottom:1rem;}
+  .confirm-box h3{font-family:'Playfair Display',serif;color:var(--cream);font-size:1.35rem;margin:0 0 .45rem;}
+  .confirm-box p{color:var(--muted);font-size:.9rem;line-height:1.55;margin:0;}
+  .confirm-actions{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin-top:1.35rem;}
+  .confirm-btn{border:0;border-radius:10px;padding:.72rem 1rem;min-height:44px;font-size:.88rem;font-weight:700;cursor:pointer;transition:transform .15s ease,opacity .15s ease,background .15s ease;}
+  .confirm-btn:active{transform:scale(.98);}
+  .confirm-btn:hover{transform:translateY(-1px);}
+  .confirm-btn.secondary{background:transparent;color:var(--cream);border:1px solid var(--border);}
+  .confirm-btn.secondary:hover{background:rgba(255,255,255,.06);}
+  .confirm-btn.danger{background:var(--fire);color:#fff;}
+  .confirm-btn.danger:hover{background:#c94010;}
+  .confirm-btn:focus-visible{outline:2px solid var(--gold);outline-offset:2px;}
+  @keyframes confirmFade{from{opacity:0}to{opacity:1}}
+  @keyframes confirmIn{to{transform:translateY(0) scale(1)}}
+  @media(max-width:640px){
+    .confirm-box{padding:1.25rem;border-radius:16px;}
+    .confirm-actions{grid-template-columns:1fr 1fr;}
+    .confirm-btn{width:100%;}
+  }
+
   /* ── ESTOQUE ── */
   .stock-pill{font-size:.82rem;font-weight:600;color:var(--cream);background:var(--card-bg);border:1px solid var(--border);border-radius:20px;padding:.25rem .75rem;}
   .stock-pill.low{border-color:#e57373;color:#e57373;}
@@ -453,7 +478,8 @@ async function doLogin(){
 }
 
 async function doLogout(){
-  if(!confirm('Deseja sair do sistema?')) return;
+  const confirmed = await showConfirm('Sair do sistema?', 'Sua sessão será encerrada e você precisará entrar novamente para acessar o painel.', 'Sim, sair', '🚪', 'Permanecer');
+  if(!confirmed) return;
   try { await fetch('/api/auth/logout', { method:'POST', headers:{'x-auth-token': getToken()||''} }); } catch(e){}
   clearToken();
   showLogin();
@@ -741,7 +767,8 @@ async function markPaid(id){
   }
 }
 async function cancelOrder(id){
-  if(!confirm('Cancelar este pedido?'))return;
+  const confirmed = await showConfirm('Cancelar reserva?', 'Essa reserva será cancelada e os itens voltarão automaticamente ao estoque.', 'Sim, cancelar', '⚠️', 'Voltar');
+  if(!confirmed) return;
   try{
     const order = orders.find(o=>o.id===id);
     await api(`/orders/${id}`,'PUT',{status:'cancelled'});
@@ -751,7 +778,8 @@ async function cancelOrder(id){
   }catch(e){toast('❌ '+e.message);}
 }
 async function deleteOrder(id){
-  if(!confirm('Remover permanentemente?'))return;
+  const confirmed = await showConfirm('Remover permanentemente?', 'Essa ação não poderá ser desfeita. O registro será excluído definitivamente.', 'Sim, remover', '🗑️', 'Voltar');
+  if(!confirmed) return;
   try{await api(`/orders/${id}`,'DELETE');toast('🗑 Removido.');await loadOrders();}
   catch(e){toast('❌ '+e.message);}
 }
@@ -1127,6 +1155,46 @@ async function shareStats(){
   }
 }
 
+
+function showConfirm(title, message, confirmText='Confirmar', icon='⚠️', cancelText='Cancelar'){
+  return new Promise(resolve=>{
+    const modal=document.getElementById('confirm-modal');
+    const titleEl=document.getElementById('confirm-title');
+    const messageEl=document.getElementById('confirm-message');
+    const iconEl=document.getElementById('confirm-icon');
+    const ok=document.getElementById('confirm-ok');
+    const cancel=document.getElementById('confirm-cancel');
+    titleEl.textContent=title;
+    messageEl.textContent=message;
+    iconEl.textContent=icon;
+    ok.textContent=confirmText;
+    cancel.textContent=cancelText;
+    modal.classList.add('open');
+    document.body.style.overflow='hidden';
+    let settled=false;
+    const finish=value=>{
+      if(settled)return;
+      settled=true;
+      modal.classList.remove('open');
+      document.body.style.overflow='';
+      ok.removeEventListener('click', onOk);
+      cancel.removeEventListener('click', onCancel);
+      modal.removeEventListener('click', onBackdrop);
+      document.removeEventListener('keydown', onKey);
+      resolve(value);
+    };
+    const onOk=()=>finish(true);
+    const onCancel=()=>finish(false);
+    const onBackdrop=e=>{if(e.target===modal)finish(false);};
+    const onKey=e=>{if(e.key==='Escape')finish(false);};
+    ok.addEventListener('click',onOk);
+    cancel.addEventListener('click',onCancel);
+    modal.addEventListener('click',onBackdrop);
+    document.addEventListener('keydown',onKey);
+    setTimeout(()=>cancel.focus(),0);
+  });
+}
+
 function updateBadge(){
   const n=orders.length; // orders já é só pendentes
   document.getElementById('order-count-badge').textContent=`${n} reserva${n!==1?'s':''} pendente${n!==1?'s':''}`;
@@ -1141,5 +1209,19 @@ function toast(msg){
 
 init();
 </script>
+
+<!-- Modal de confirmação moderno -->
+<div id="confirm-modal" class="confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+  <div class="confirm-box">
+    <div id="confirm-icon" class="confirm-icon">⚠️</div>
+    <h3 id="confirm-title">Confirmar ação</h3>
+    <p id="confirm-message">Tem certeza que deseja continuar?</p>
+    <div class="confirm-actions">
+      <button type="button" id="confirm-cancel" class="confirm-btn secondary">Cancelar</button>
+      <button type="button" id="confirm-ok" class="confirm-btn danger">Confirmar</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
