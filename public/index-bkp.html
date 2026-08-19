@@ -207,9 +207,52 @@
     .stats-grid{grid-template-columns:repeat(2,1fr);}
     .stat-box .num{font-size:1.4rem;}
   }
+
+    /* ── MODAL DE CONFIRMAÇÃO ───────────────────────────────────────────── */
+    .confirm-modal-backdrop{
+      position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;
+      padding:1rem;background:rgba(0,0,0,.68);backdrop-filter:blur(5px);
+    }
+    .confirm-modal-backdrop.open{display:flex;animation:fadeIn .18s ease-out;}
+    .confirm-modal{
+      width:min(420px,100%);background:var(--card-bg);border:1px solid var(--border);
+      border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.45);padding:1.35rem;
+      transform:translateY(8px);animation:modalUp .2s ease-out forwards;
+    }
+    .confirm-icon{
+      width:44px;height:44px;border-radius:50%;display:grid;place-items:center;
+      background:rgba(232,77,28,.12);border:1px solid rgba(232,77,28,.3);
+      color:var(--ember);font-size:1.25rem;margin-bottom:.9rem;
+    }
+    .confirm-modal h3{margin:0 0 .4rem;color:var(--cream);font-size:1.05rem;}
+    .confirm-modal p{margin:0;color:var(--muted);font-size:.88rem;line-height:1.5;}
+    .confirm-actions{display:flex;gap:.65rem;justify-content:flex-end;margin-top:1.2rem;}
+    .confirm-actions button{min-width:105px;}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes modalUp{to{transform:translateY(0)}}
+    @media(max-width:480px){
+      .confirm-modal{padding:1.1rem;}
+      .confirm-actions{flex-direction:column-reverse;}
+      .confirm-actions button{width:100%;}
+    }
+
 </style>
 </head>
 <body>
+
+<!-- ── CONFIRMAÇÃO DE LOGOUT ───────────────────────────────────────────── -->
+<div id="logout-modal" class="confirm-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="logout-title">
+  <div class="confirm-modal">
+    <div class="confirm-icon">↪</div>
+    <h3 id="logout-title">Sair do sistema?</h3>
+    <p>Sua sessão será encerrada neste dispositivo.</p>
+    <div class="confirm-actions">
+      <button class="btn btn-secondary" type="button" onclick="closeLogoutModal()">Cancelar</button>
+      <button class="btn btn-primary" type="button" onclick="confirmLogout()">Sair</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- ── TELA DE LOGIN ────────────────────────────────────────────────────── -->
 <div id="login-screen">
@@ -432,7 +475,14 @@ async function doLogin(){
     setToken(data.token);
     hideLogin();
     document.getElementById('login-password').value = '';
-    await init();
+    await document.getElementById('logout-modal')?.addEventListener('click', e=>{
+  if(e.target.id==='logout-modal') closeLogoutModal();
+});
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape') closeLogoutModal();
+});
+
+init();
   } catch(e) {
     err.textContent = e.message;
     err.classList.add('visible');
@@ -441,12 +491,26 @@ async function doLogin(){
   }
 }
 
-async function doLogout(){
-  if(!confirm('Deseja sair do sistema?')) return;
+function doLogout(){
+  openLogoutModal();
+}
+
+function openLogoutModal(){
+  const modal=document.getElementById('logout-modal');
+  if(!modal) return;
+  modal.classList.add('open');
+  setTimeout(()=>modal.querySelector('button')?.focus(),50);
+}
+
+function closeLogoutModal(){
+  document.getElementById('logout-modal')?.classList.remove('open');
+}
+
+async function confirmLogout(){
+  closeLogoutModal();
   try { await fetch('/api/auth/logout', { method:'POST', headers:{'x-auth-token': getToken()||''} }); } catch(e){}
   clearToken();
   showLogin();
-  // Limpa os dados da tela
   orders=[]; allOrdersCache=[]; history=[];
   document.getElementById('orders-list').innerHTML='';
   document.getElementById('history-list').innerHTML='';
@@ -559,39 +623,29 @@ function closeStockModal() { document.getElementById('stock-modal').classList.re
 
 async function saveStock() {
   const dataVenda = document.getElementById('stock-date').value;
-  if (!dataVenda) {
-    toast('⚠ Selecione uma data de venda.');
-    return;
-  }
+  if (!dataVenda) return alert('Por favor, selecione uma data de venda.');
 
-  // Envia TODOS os campos de estoque suportados pelo backend.
-  // Isso evita que meio frango e frango recheado sejam gravados como zero.
+  // TESTE: Enviando apenas os 3 que já funcionavam antes no seu banco
   const novosDados = {
     meat: parseFloat(document.getElementById('stock-input-meat').value) || 0,
     ribs: parseFloat(document.getElementById('stock-input-ribs').value) || 0,
-    half_chicken: parseFloat(document.getElementById('stock-input-half-chicken').value) || 0,
-    chicken: parseFloat(document.getElementById('stock-input-chicken').value) || 0,
-    chicken_special: parseFloat(document.getElementById('stock-input-chicken-special').value) || 0
+    chicken: parseFloat(document.getElementById('stock-input-chicken').value) || 0
   };
 
   try {
-    const saved = await api(`/stock/${dataVenda}`, 'POST', novosDados);
-
-    // Usa o retorno do servidor como fonte de verdade.
-    currentStock = {
-      meat: parseFloat(saved.meat) || 0,
-      ribs: parseFloat(saved.ribs) || 0,
-      half_chicken: parseFloat(saved.half_chicken) || 0,
-      chicken: parseFloat(saved.chicken) || 0,
-      chicken_special: parseFloat(saved.chicken_special) || 0
-    };
-
+    await api(`/stock/${dataVenda}`, 'POST', novosDados);
+    
+    // Atualiza o estado na memória do navegador
+    currentStock.meat = novosDados.meat;
+    currentStock.ribs = novosDados.ribs;
+    currentStock.chicken = novosDados.chicken;
+    
     renderStockBar();
     closeStockModal();
-    toast('✓ Estoque salvo com sucesso!');
-  } catch(e) {
+    alert('Estoque gravado com sucesso (modo teste)!');
+  } catch(e) { 
     console.error('Erro ao salvar estoque:', e);
-    toast('❌ Erro ao gravar o estoque: ' + (e.message || 'verifique o servidor.'));
+    alert('Erro ao gravar as informações no servidor.');
   }
 }
 
